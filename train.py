@@ -101,6 +101,8 @@ def train(sketch_model, view_model, classifier, criterion_am,
     view_dataloader_iter = iter(view_dataloader)
 
     for batch_idx in range(max(view_size, sketch_size)):
+        ##################################################################
+        # 两个数据集大小不一样，当少的数据集加载完而多的数据集没有加载完的时候，重新加载少的数据集
         if sketch_size > view_size:
             sketch = next(sketch_dataloader_iter)
             try:
@@ -117,6 +119,7 @@ def train(sketch_model, view_model, classifier, criterion_am,
                 del sketch_dataloader_iter
                 sketch_dataloader_iter = iter(sketch_dataloader)
                 sketch = next(sketch_dataloader_iter)
+        ###################################################################
 
         sketch_data, sketch_labels = sketch
         view_data, view_labels = view
