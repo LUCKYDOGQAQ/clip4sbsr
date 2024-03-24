@@ -74,7 +74,7 @@ class MVCNN(nn.Module):
         view_pool = []
 
         for v in x:
-            v = v.type(torch.cuda.FloatTensor)
+            v = v.type(torch.FloatTensor).to("mps")
             feature = self.model(v).image_embeds
             feature=feature.unsqueeze(0)
             view_pool.append(feature)

@@ -16,7 +16,7 @@ class CenterLoss:
                   torch.pow(weights, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
         distmat.addmm_(features, weights.t(),beta=1,alpha=-2)
 
-        classes = torch.arange(self.num_classes).long().cuda()
+        classes = torch.arange(self.num_classes).long().to("mps")
         targetss = targets.unsqueeze(1).expand(batch_size, self.num_classes)
         mask = targetss.eq(classes.expand(batch_size, self.num_classes))
 

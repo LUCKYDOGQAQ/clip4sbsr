@@ -23,6 +23,8 @@ from reader.view_dataset_reader import MultiViewDataSet
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics.pairwise import pairwise_distances
 
+from tqdm import tqdm
+
 parser = argparse.ArgumentParser("feature extraction of sketch images")
 # SHREC13
 # parser.add_argument('--sketch-datadir', type=str, default='E:/3d_retrieval/Dataset/Shrec13_ZS2/13_sketch_test_picture')
@@ -49,7 +51,7 @@ parser.add_argument('--cnn-feat-dim', type=int, default=512)
 parser.add_argument('--feat-dim', type=int, default=256)
 parser.add_argument('--test-feat-dir', type=str, default='feature.mat')
 parser.add_argument('--train-feat-dir', type=str, default='/home/daiweidong/david/strong_baseline/sketch_modality/shrec_14/train_sketch_picture')
-parser.add_argument('--model-dir', type=str, default='./saved_model_14_3/Epoch10/')
+parser.add_argument('--model-dir', type=str, default='./saved_model_14_3Epoch10/')
 
 parser.add_argument('--pattern', type=bool, default=False,
                     help="Extract training data features or test data features,'True' is for train dataset")
@@ -102,7 +104,7 @@ def evaluation_metric(distance_matrix, sketch_label, view_label,dist_type):
     Av_E = np.zeros((sketch_num, 1));
     Av_DCG = np.zeros((sketch_num, 1));
 
-    for j in range(sketch_num):
+    for j in tqdm(range(sketch_num), leave=True, desc="Evaluating"):
         true_label = sketch_label[j]
         view_label_num = view_label_count[true_label]
         # print(view_label_num)
@@ -171,8 +173,8 @@ def evaluation_metric(distance_matrix, sketch_label, view_label,dist_type):
             #print(Av_Precision[j])
             #print("++++++++++++++++++++++++++++")
             #time.sleep(1)
-        if j % 100 == 0:
-            print("==> test samplses [%d/%d]" % (j, view_num))
+        # if j % 100 == 0:
+        #     print("==> test samplses [%d/%d]" % (j, view_num))
 
     return Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision
 
@@ -199,15 +201,19 @@ def main():
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
-    use_gpu = torch.cuda.is_available()
+    use_gpu = torch.cuda.is_available() or torch.backends.mps.is_available()
+    if torch.cuda.is_available(): device = "cuda"
+    elif torch.backends.mps.is_available(): device = "mps"
+    else: device = "cpu"
 
     # sys.stdout = Logger(osp.join(args.save_dir, 'log_' + args.dataset + '.txt'))
-    if use_gpu:
-        print("Currently using GPU: {}".format(args.gpu))
-        cudnn.benchmark = True
-        # torch.cuda.manual_seed_all(args.seed)
-    else:
-        print("Currently using CPU")
+    # if use_gpu:
+    #     print("Currently using GPU: {}".format(args.gpu))
+    #     cudnn.benchmark = True
+    #     # torch.cuda.manual_seed_all(args.seed)
+    # else:
+    #     print("Currently using CPU")
+    print(f"Currently using device: {device}")
 
     sketchloader,viewloader,sketch_num,view_num = get_test_data(args.sketch_datadir,args.view_datadir)
     sketch_model = SketchModel(backbone=args.model)
@@ -215,9 +221,9 @@ def main():
     classifier = Classifier(12,args.cnn_feat_dim,args.num_classes)
 
     if use_gpu:
-        sketch_model =sketch_model.cuda()
-        view_model = view_model.cuda()
-        classifier = classifier.cuda()
+        sketch_model =sketch_model.to(device)
+        view_model = view_model.to(device)
+        classifier = classifier.to(device)     
 
     # Load model
     # sketch_model.load(args.model_dir+'sketch_lora')
@@ -234,9 +240,10 @@ def main():
     view_feature = None
     view_labels = None
 
-    for batch_idx, (data, labels) in enumerate(sketchloader):
+    for batch_idx, (data, labels) in tqdm((enumerate(sketchloader)), total = len(viewloader), leave=True, desc="Extracting sketch features"):
         if use_gpu:
-            data, labels = data.cuda(), labels.cuda()
+            data, labels = data.to(device), labels.to(device)
+
         # print(batch_idx)
         with torch.no_grad():
             output = sketch_model.forward(data)
@@ -254,12 +261,14 @@ def main():
         else:
             sketch_feature=np.concatenate((sketch_feature,outputs_numpy),axis=0)
             sketch_labels=np.concatenate((sketch_labels,labels_numpy),axis=0)
-        print("==> test samplses [%d/%d]" % (batch_idx+1, np.ceil(sketch_num / args.batch_size)))
-    for batch_idx, (data, labels) in enumerate(viewloader):
+        # print("==> test samplses [%d/%d]" % (batch_idx+1, np.ceil(sketch_num / args.batch_size)))
+    
+    for batch_idx, (data, labels) in tqdm((enumerate(viewloader)), total = len(viewloader), leave=True, desc="Extracting view features"):
         data = np.stack(data, axis=1)
         data = torch.from_numpy(data)
         if use_gpu:
-            data, labels = data.cuda(), labels.cuda()
+            data, labels = data.to(device), labels.to(device)
+            
         with torch.no_grad():
             output = view_model.forward(data)
             mu_embeddings= classifier.forward(output)
@@ -276,7 +285,7 @@ def main():
         else:
             view_feature=np.concatenate((view_feature,outputs_numpy),axis=0)
             view_labels=np.concatenate((view_labels,labels_numpy),axis=0)
-        print("==> test samplses [%d/%d]" % (batch_idx+1, np.ceil(view_num / args.batch_size)))
+        # print("==> test samplses [%d/%d]" % (batch_idx+1, np.ceil(view_num / args.batch_size)))
 
     feature_data = {'sketch_feature': sketch_feature, 'sketch_labels': sketch_labels,
                     'view_feature': view_feature, 'view_labels': view_labels}
@@ -289,7 +298,7 @@ def main():
     print("E:", Av_E.mean())
     print("DCG:", Av_DCG.mean())
     print("mAP", Av_Precision.mean())
-    # torch.save(feature_data,args.test_feat_dir)
+    torch.save(feature_data,args.test_feat_dir)
     #torch.save(sketch_uncer,"sketch_uncertainty.mat")
     #torch.save(dist,'baseline_dist.mat')
 

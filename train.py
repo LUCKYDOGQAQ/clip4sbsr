@@ -19,6 +19,9 @@ from reader.view_dataset_reader import MultiViewDataSet
 from loss.am_softmax import AMSoftMaxLoss
 import os
 
+from tqdm import tqdm
+from pathlib import Path
+
 
 
 from peft import LoraConfig
@@ -100,7 +103,9 @@ def train(sketch_model, view_model, classifier, criterion_am,
     sketch_dataloader_iter = iter(sketch_dataloader)
     view_dataloader_iter = iter(view_dataloader)
 
-    for batch_idx in range(max(view_size, sketch_size)):
+    for iteration, batch_idx in tqdm(enumerate(range(max(view_size, sketch_size)))):
+        if iteration==1:
+            break
         ##################################################################
         # 两个数据集大小不一样，当少的数据集加载完而多的数据集没有加载完的时候，重新加载少的数据集
         if sketch_size > view_size:
@@ -126,8 +131,8 @@ def train(sketch_model, view_model, classifier, criterion_am,
         view_data = np.stack(view_data, axis=1)
         view_data = torch.from_numpy(view_data)
         if use_gpu:
-            sketch_data, sketch_labels, view_data, view_labels = sketch_data.cuda(), sketch_labels.cuda(), \
-                                                                 view_data.cuda(), view_labels.cuda()
+            sketch_data, sketch_labels, view_data, view_labels = sketch_data.to("mps"), sketch_labels.to("mps"), \
+                                                                 view_data.to("mps"), view_labels.to("mps")
 
 
         sketch_features = sketch_model.forward(sketch_data)
@@ -166,6 +171,9 @@ def main():
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
     use_gpu = torch.cuda.is_available()
+    if torch.cuda.is_available(): device = "cuda"
+    elif torch.backends.mps.is_available: device = "mps"
+    else: device = "cpu"
 
     if use_gpu:
         print("Currently using GPU: {}".format(args.gpu))
@@ -176,8 +184,10 @@ def main():
 
     print("Creating model: {}".format(args.model))
 
-    lora_config=LoraConfig(target_modules=["q_proj", "k_proj"],r=args.lora_rank,lora_alpha=16,
-    lora_dropout=0.1)
+    lora_config=LoraConfig(target_modules=["q_proj", "k_proj"],
+                           r=args.lora_rank,
+                           lora_alpha=16,
+                           lora_dropout=0.1)
 
     sketch_model = SketchModel(lora_config=lora_config,backbone=args.model)
     view_model = MVCNN(lora_config=lora_config,backbone=args.model)
@@ -185,9 +195,9 @@ def main():
 
 
 
-    sketch_model = sketch_model.cuda()
-    view_model = view_model.cuda()
-    classifier = classifier.cuda()
+    sketch_model = sketch_model.to("mps")
+    view_model = view_model.to("mps")
+    classifier = classifier.to("mps")
 
 
     # Cross Entropy Loss and Center Loss
@@ -208,12 +218,14 @@ def main():
               optimizer_model, sketch_trainloader, view_trainloader, use_gpu)
 
 
-        if not os.path.exists(args.model_dir +'/Epoch'+str(epoch)):
-            os.mkdir(args.model_dir +'/Epoch'+str(epoch))
+        model_save_path = Path(args.model_dir +'Epoch'+str(epoch))
+        if not model_save_path.exists():
+            # os.makedirs(model_save_path)
+            model_save_path.mkdir(parents=True, exist_ok=True)
         torch.save(classifier.state_dict(),
-                   args.model_dir +'/Epoch'+str(epoch)+ '/mlp_layer.pth')
-        sketch_model.save(args.model_dir +'/Epoch'+str(epoch)+ '/sketch_lora')
-        view_model.save(args.model_dir +'/Epoch'+str(epoch)+'/view_lora')
+                   model_save_path / 'mlp_layer.pth')
+        sketch_model.save(model_save_path / 'sketch_lora')
+        view_model.save(model_save_path / 'view_lora')
 
         if args.stepsize > 0: scheduler.step()
 
