@@ -1,1 +1,0 @@
-/opt/anaconda3/envs/clip4sbsr/bin/python /Users/zhikaili/workspace/clip/train.py -c /Users/zhikaili/workspace/clip/config/config.yaml

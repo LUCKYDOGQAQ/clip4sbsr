@@ -12,10 +12,10 @@ train:
 model:
   pretrain: true
   model: 'openai/clip-vit-base-patch32'
-  ckpt_dir: '/Users/zhikaili/workspace/clip/ckpt/Epoch0'
+  ckpt_dir: '/Users/zhikaili/workspace/clip4sbsr/ckpt/Epoch0'
 features:
   cnn_feat_dim: 512
   feat_dim: 256
-  test_feat_dir: '/Users/zhikaili/workspace/clip/output/feature.mat'
+  test_feat_dir: '/Users/zhikaili/workspace/clip4sbsr/output/feature.mat'
   train_feat_dir: '/home/daiweidong/david/strong_baseline/sketch_modality/shrec_14/train_sketch_picture'
   pattern: false
