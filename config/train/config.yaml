@@ -1,0 +1,24 @@
+dataset:
+  sketch_datadir: '/Users/zhikaili/workspace/DATASET/SHREC13_ZS2/13_sketch_train_picture'
+  view_datadir: '/Users/zhikaili/workspace/DATASET/SHREC13_ZS2/13_view_render_train_img'
+  workers: 6
+  sketch_batch_size: 16
+  view_batch_size: 16
+train:
+  num_classes: 133
+  lr_model: 1.0e-3
+  max_epoch: 100
+  stepsize: 10
+  gamma: 0.9
+  feat_dim: 512
+  # print_freq: 10
+  # save_model_freq: 10
+  gpu: '0,1,2,3'
+  seed: 1
+  count: 0
+model:
+  model: "openai/clip-vit-base-patch32"
+  ckpt_dir: './ckpt/'
+  lora_rank: 32
+  alph: 12
+

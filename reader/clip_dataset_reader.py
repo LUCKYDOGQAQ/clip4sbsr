@@ -6,8 +6,11 @@ import torch
 class ClipDataSet(Dataset):
 
     def __init__(self, x,y, transform=None, target_transform=None):
-        self.x = torch.Tensor(x).type(dtype=torch.float).to("mps")
-        self.y = torch.Tensor(y).type(dtype=torch.int64).to("mps")
+        if torch.cuda.is_available(): self.device = "cuda"
+        elif torch.backends.mps.is_available: self.device = "mps"
+        else: self.device = "cpu"
+        self.x = torch.Tensor(x).type(dtype=torch.float).to(self.device)
+        self.y = torch.Tensor(y).type(dtype=torch.int64).to(self.device)
         self.transform = transform
         self.target_transform = target_transform
 

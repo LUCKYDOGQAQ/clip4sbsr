@@ -24,6 +24,10 @@ class MVCNN(nn.Module):
         self.model=CLIPVisionModelWithProjection.from_pretrained(backbone)
         if lora_config is not None:
             self.model.add_adapter(lora_config, adapter_name="view_adapter")
+        
+        if torch.cuda.is_available(): self.device = "cuda"
+        elif torch.backends.mps.is_available: self.device = "mps"
+        else: self.device = "cpu"
 
 
     def forward(self, x):
@@ -74,7 +78,7 @@ class MVCNN(nn.Module):
         view_pool = []
 
         for v in x:
-            v = v.type(torch.FloatTensor).to("mps")
+            v = v.type(torch.FloatTensor).to(self.device)
             feature = self.model(v).image_embeds
             feature=feature.unsqueeze(0)
             view_pool.append(feature)

@@ -1,5 +1,7 @@
 *.mat
-saved_model/
+ckpt/
+wandb/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

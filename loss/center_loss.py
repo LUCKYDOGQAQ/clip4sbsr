@@ -7,6 +7,10 @@ class CenterLoss:
     def __init__(self,num_classes,feat_dim) -> None:
         self.num_classes = num_classes
         self.feat_dim = feat_dim
+        if torch.cuda.is_available(): self.device = "cuda"
+        elif torch.backends.mps.is_available: self.device = "mps"
+        else: self.device = "cpu"
+        
 
 
     def __call__(self, features: torch.Tensor, weights: torch.LongTensor,targets: torch.LongTensor) -> torch.Tensor:
@@ -16,7 +20,7 @@ class CenterLoss:
                   torch.pow(weights, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
         distmat.addmm_(features, weights.t(),beta=1,alpha=-2)
 
-        classes = torch.arange(self.num_classes).long().to("mps")
+        classes = torch.arange(self.num_classes).long().to(self.device)
         targetss = targets.unsqueeze(1).expand(batch_size, self.num_classes)
         mask = targetss.eq(classes.expand(batch_size, self.num_classes))
 

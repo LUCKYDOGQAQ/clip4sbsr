@@ -1,10 +1,10 @@
 conda create -n clip4sbsr python=3.10
 conda init
 conda activate clip4sbsr
-# conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=12.1 -c pytorch -c nvidia
-conda install pytorch::pytorch torchvision torchaudio -c pytorch
-conda install -c huggingface transformers
-conda install -y numpy
+
+pip install torch==2.1 torchvision==0.16 torchaudio==2.1.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install transformers==4.36.2
 pip install peft
 pip install adapters
+pip install numpy
 
