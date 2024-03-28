@@ -4,6 +4,7 @@ wandb/
 data/
 core.*
 hf_model/models--openai--clip-vit-base-patch32
+.vscode/
 
 
 # Byte-compiled / optimized / DLL files
