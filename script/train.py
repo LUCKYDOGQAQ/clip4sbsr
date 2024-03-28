@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from model.sketch_model import SketchModel
 from model.view_model import MVCNN
 from model.classifier import Classifier
-from dataset.view_dataset_dataset import MultiViewDataSet
+from dataset.view_dataset_reader import MultiViewDataSet
 from loss.am_softmax import AMSoftMaxLoss
 import os
 
@@ -153,13 +153,14 @@ def load_logger(config):
     )
 
 def main():
-    load_logger(config)
 
     torch.manual_seed(config.train.seed)
     os.environ['CUDA_VISIBLE_DEVICES'] = config.train.gpu
     os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
     os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
     os.environ['WANDB_MODE'] = 'offline'
+
+    load_logger(config)
 
     use_gpu = torch.cuda.is_available() or torch.backends.mps.is_available()
     if torch.cuda.is_available(): 
@@ -212,7 +213,7 @@ def main():
         if config.train.stepsize > 0:
             scheduler.step()
 
-        print("==> Epoch {}/{}".format(epoch + 1, config.max_epoch))
+        print("==> Epoch {}/{}".format(epoch + 1, config.train.max_epoch))
         print("++++++++++++++++++++++++++")
         # save model
 
@@ -220,7 +221,7 @@ def main():
               optimizer_model, sketch_trainloader, view_trainloader, use_gpu, device)
 
 
-        model_save_path = Path(config.ckpt_dir) / f'Epoch{epoch}'
+        model_save_path = Path(config.model.ckpt_dir) / f'Epoch{epoch}'
         if not model_save_path.exists():
             model_save_path.mkdir(parents=True, exist_ok=True)
         
@@ -228,7 +229,7 @@ def main():
         sketch_model.save(model_save_path / 'sketch_lora')
         view_model.save(model_save_path / 'view_lora')
 
-        if config.stepsize > 0: scheduler.step()
+        if config.train.stepsize > 0: scheduler.step()
 
 
 if __name__ == '__main__':

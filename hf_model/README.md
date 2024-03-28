@@ -1,0 +1,1 @@
+Put the model folder `openai--clip-vit-base-patch32` here

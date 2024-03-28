@@ -1,6 +1,6 @@
 dataset:
-  sketch_datadir: '/Users/zhikaili/workspace/DATASET/SHREC13_ZS2/13_sketch_test_picture'
-  view_datadir: '/Users/zhikaili/workspace/DATASET/SHREC13_ZS2/13_view_render_test_img'
+  sketch_datadir: './data/SHREC13_ZS2/13_sketch_test_picture'
+  view_datadir: './data/SHREC13_ZS2/13_view_render_test_img'
   batch_size: 32
   workers: 5
 train:
@@ -11,11 +11,11 @@ train:
   uncer: false
 model:
   pretrain: true
-  model: 'openai/clip-vit-base-patch32'
-  ckpt_dir: '/Users/zhikaili/workspace/clip4sbsr/ckpt/Epoch0'
+  model: './hf_model/openai--clip-vit-base-patch32'
+  ckpt_dir: './ckpt/Epoch99'
 features:
   cnn_feat_dim: 512
   feat_dim: 256
-  test_feat_dir: '/Users/zhikaili/workspace/clip4sbsr/output/feature.mat'
-  train_feat_dir: '/home/daiweidong/david/strong_baseline/sketch_modality/shrec_14/train_sketch_picture'
-  pattern: false
+  test_feat_dir: './output/feature.mat'
+  # train_feat_dir: './output/train/'
+  # pattern: false

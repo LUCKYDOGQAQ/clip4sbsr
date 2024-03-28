@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # -*- coding: utf-8 -*-
+import sys
+sys.path.append('.')
 
 import numpy as np
 import time
@@ -10,21 +12,30 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tqdm import tqdm
 from utils.metric import cal_euc_distance, cal_cosine_distance, evaluation_metric
 
+from pathlib import Path
+import yaml
+from easydict import EasyDict
+
+# parser = argparse.ArgumentParser("Retrieval Evaluation")
+
+# parser.add_argument('--class-sorting-file', type=str, default='../class_sorting/sketch_class_sorting.mat',
+#                     help="class sorting  flie of test sketches, .mat file")
+
+# parser.add_argument('--distance-type', type=str, choices=['cosine','euclidean'],default='cosine')
+# parser.add_argument('--num-testsketch-samples', type=int, default=171*30)
+# # parser.add_argument('--num-classes', type=int, default=171)
+# parser.add_argument('--num-view-samples', type=int, default=8987)
+
+# parser.add_argument('--feat-file', type=str,
+#                     default='feature.mat',
+#                     help="features flie of test sketches, .mat file")
+
+# args = parser.parse_args()
+
 parser = argparse.ArgumentParser("Retrieval Evaluation")
-
-parser.add_argument('--class-sorting-file', type=str, default='../class_sorting/sketch_class_sorting.mat',
-                    help="class sorting  flie of test sketches, .mat file")
-
-parser.add_argument('--distance-type', type=str, choices=['cosine','euclidean'],default='cosine')
-parser.add_argument('--num-testsketch-samples', type=int, default=171*30)
-# parser.add_argument('--num-classes', type=int, default=171)
-parser.add_argument('--num-view-samples', type=int, default=8987)
-
-parser.add_argument('--feat-file', type=str,
-                    default='feature.mat',
-                    help="features flie of test sketches, .mat file")
-
-args = parser.parse_args()
+parser.add_argument('-c', '--config', help="running configurations", type=str, required=True)
+with open(parser.parse_args().config, 'r', encoding='utf-8') as r:
+    config = EasyDict(yaml.safe_load(r))
 
 
 def get_feat_and_labels(feat_file):
@@ -52,15 +63,15 @@ def get_feat_and_labels(feat_file):
 
 
 def main():
-    sketch_feature, sketch_label, view_feature, view_label = get_feat_and_labels(args.feat_file)
+    sketch_feature, sketch_label, view_feature, view_label = get_feat_and_labels(config.feat_file)
     # sketch_label=np.expand_dims(sketch_label,1)
     # view_label = np.expand_dims(view_label, 1)
-    if args.distance_type == 'euclidean':
+    if config.distance_type == 'euclidean':
         distance_matrix = cal_euc_distance(sketch_feature,view_feature)
-    elif args.distance_type == 'cosine':
+    elif config.distance_type == 'cosine':
         distance_matrix = cal_cosine_distance(sketch_feature,view_feature)
 
-    print(sketch_label)
+    # print(sketch_label)
     # if MODE=='CLF':
     #     for i in range(distance_matrix.shape[0]):
     #         distance_matrix[i,np.where(view_label==sketch_predict_label[i])[0]]+=1000
@@ -72,7 +83,7 @@ def main():
     distance_matrix_data = {"distance_matrix":distance_matrix}
     torch.save(distance_matrix_data,"distance_matrix.mat")
 
-    Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision = evaluation_metric(distance_matrix,sketch_label, view_label,args.distance_type)
+    Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision = evaluation_metric(distance_matrix,sketch_label, view_label,config.distance_type)
 
     torch.save(Av_Precision,'precison.mat')
     print("NN:", Av_NN.mean())

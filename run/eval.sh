@@ -1,2 +1,2 @@
-cd /Users/zhikaili/workspace/clip4sbsr
-/opt/anaconda3/envs/clip4sbsr/bin/python -W ignore /Users/zhikaili/workspace/clip4sbsr/retrieval_evalution.py 
+cd /lizhikai/workspace/clip4sbsr
+/lizhikai/anaconda3/envs/clip4sbsr/bin/python script/retrieval_evalution.py -c config/evaluation/config.yaml

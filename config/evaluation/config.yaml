@@ -1,0 +1,5 @@
+class_sorting_file: "../class_sorting/sketch_class_sorting.mat"
+distance_type: "cosine" # ["cosine", "euclidean"]
+num_testsketch_samples: 5130
+num_view_samples: 8987
+feat_file: "./output/feature.mat"
