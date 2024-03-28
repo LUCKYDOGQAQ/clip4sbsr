@@ -3,7 +3,7 @@ ckpt/
 wandb/
 data/
 core.*
-hf_model/openai--clip-vit-base-patch32
+hf_model/models--openai--clip-vit-base-patch32
 
 
 # Byte-compiled / optimized / DLL files

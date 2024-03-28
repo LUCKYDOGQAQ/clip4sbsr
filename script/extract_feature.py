@@ -48,7 +48,7 @@ from easydict import EasyDict
 # parser.add_argument('--gpu', type=str, default='0')
 # parser.add_argument('--seed', type=int, default=1)
 # parser.add_argument('--use-cpu', action='store_false')
-# parser.add_argument('--model', default="/lizhikai/workspace/clip4sbsr/hf_model/openai--clip-vit-base-patch32")
+# parser.add_argument('--model', default="/lizhikai/workspace/clip4sbsr/hf_model/models--openai--clip-vit-base-patch32")
 # parser.add_argument('--pretrain', type=bool, choices=[True, False], default=True)
 # parser.add_argument('--uncer', type=bool, choices=[True, False], default=False)
 # # features

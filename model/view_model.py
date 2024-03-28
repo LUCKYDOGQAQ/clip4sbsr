@@ -19,7 +19,7 @@ from transformers import CLIPVisionModelWithProjection
 class MVCNN(nn.Module):
     """definition."""
 
-    def __init__(self,lora_config=None,backbone="/lizhikai/workspace/clip4sbsr/hf_model/openai--clip-vit-base-patch32"):
+    def __init__(self,lora_config=None,backbone="/lizhikai/workspace/clip4sbsr/hf_model/models--openai--clip-vit-base-patch32"):
         super(MVCNN, self).__init__()
         self.model=CLIPVisionModelWithProjection.from_pretrained(backbone)
         if lora_config is not None:

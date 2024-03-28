@@ -17,7 +17,7 @@ train:
   seed: 1
   count: 0
 model:
-  model: "/lizhikai/workspace/clip4sbsr/hf_model/openai--clip-vit-base-patch32"
+  model: "/lizhikai/workspace/clip4sbsr/hf_model/models--openai--clip-vit-base-patch32"
   ckpt_dir: './ckpt/'
   lora_rank: 32
   alph: 12

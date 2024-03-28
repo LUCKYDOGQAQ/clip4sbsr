@@ -11,7 +11,7 @@ train:
   uncer: false
 model:
   pretrain: true
-  model: './hf_model/openai--clip-vit-base-patch32'
+  model: './hf_model/models--openai--clip-vit-base-patch32'
   ckpt_dir: './ckpt/Epoch99'
 features:
   cnn_feat_dim: 512
