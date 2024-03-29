@@ -12,7 +12,7 @@ train:
 model:
   pretrain: true
   model: './hf_model/models--openai--clip-vit-base-patch32'
-  ckpt_dir: './ckpt/Epoch99'
+  ckpt_dir: './ckpt/Epoch20'
 features:
   cnn_feat_dim: 512
   feat_dim: 256

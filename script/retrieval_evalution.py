@@ -81,11 +81,11 @@ def main():
 
 
     distance_matrix_data = {"distance_matrix":distance_matrix}
-    torch.save(distance_matrix_data,"distance_matrix.mat")
+    torch.save(distance_matrix_data,"./output/distance_matrix.mat")
 
     Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision = evaluation_metric(distance_matrix,sketch_label, view_label,config.distance_type)
 
-    torch.save(Av_Precision,'precison.mat')
+    torch.save(Av_Precision,'./output/precison.mat')
     print("NN:", Av_NN.mean())
     print("FT:", Av_FT.mean())
     print("ST:", Av_ST.mean())

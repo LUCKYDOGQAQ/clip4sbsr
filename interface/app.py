@@ -12,6 +12,30 @@ from model.view_model import MVCNN
 from pathlib import Path
 from PIL import Image
 
+from torchvision import datasets
+from dataset.view_dataset_reader import MultiViewDataSet
+from torchvision import transforms
+import torch.nn.functional as F
+
+def topk_result(sketch_feature, k):
+    feature = torch.load("/lizhikai/workspace/clip4sbsr/output/feature.mat")
+    for key in feature.keys():
+        feature[key] = torch.tensor(feature[key]).to("cuda")
+
+    cosine_similarities = F.cosine_similarity(sketch_feature, feature['view_feature'], dim=1)
+    top_scores, top_indices = torch.topk(cosine_similarities, k)
+
+    # sketch_data = datasets.ImageFolder(root="/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_sketch_test_picture", transform=transforms.Resize(224))
+    view_data = MultiViewDataSet(root="/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_view_render_test_img", transform=transforms.Resize(224))
+    res_images = []
+    res_labels = []
+    for i in top_indices:
+        res_images.append(view_data[i][0][0])
+        res_labels.append(view_data[i][0][1])
+
+    return res_images, res_labels
+
+
 def sbsr(input_img):
 
     use_gpu = torch.cuda.is_available() or torch.backends.mps.is_available()
@@ -33,7 +57,7 @@ def sbsr(input_img):
     # sketch_model.load(args.ckpt_dir+'sketch_lora')
     # view_model.load(args.ckpt_dir + 'view_lora')
         
-    classifier.load_state_dict(torch.load(Path('./ckpt/Epoch99') / 'mlp_layer.pth'))
+    classifier.load_state_dict(torch.load(Path('./ckpt/Epoch29') / 'mlp_layer.pth'))
     sketch_model.eval()
     view_model.eval()
     classifier.eval() 
@@ -47,25 +71,24 @@ def sbsr(input_img):
                              [0.26862954, 0.26130258, 0.27577711])])
     input = image_transforms(pil_img).unsqueeze(0).to(device)
 
-    print(input.shape)
+    # print(input.shape)
     with torch.no_grad():
         output = sketch_model.forward(input)
         mu_embeddings= classifier.forward(output)
         #mu_embeddings,logits = classifier.forward(output)
 
     # 提前计算好，数据库中的view embedding，进行比对排名，得到最相近的model
-    embd = nn.functional.normalize(mu_embeddings, dim=1)
-
-    return str(embd)
+    sketch_feature = nn.functional.normalize(mu_embeddings, dim=1)
+    print(sketch_feature.size)
+    res_images, res_labels = topk_result(sketch_feature, 10)
+    return res_images[0]
 
 
 demo = gr.Interface(fn=sbsr, 
                     inputs=gr.Image(label="Sketch"), 
-                    outputs="text",
+                    outputs="image",
                     title="3D Shape Model Retrieval using Sketch",
-                    title_align="center",
                     description="Upload a Sketch to find the most similar 3D Shape Models!")
-# demo = gr.Interface(sbsr, gr.Image(label="Sketch"), gr.Image(label="3D Shape Model"))
 
 demo.launch()
 

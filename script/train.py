@@ -217,11 +217,11 @@ def main():
         print("++++++++++++++++++++++++++")
         # save model
 
-        train(sketch_model, view_model, classifier, criterion_am,
+        avg_acc = train(sketch_model, view_model, classifier, criterion_am,
               optimizer_model, sketch_trainloader, view_trainloader, use_gpu, device)
 
 
-        model_save_path = Path(config.model.ckpt_dir) / f'Epoch{epoch}'
+        model_save_path = Path(config.model.ckpt_dir) / 'exp2' / f'Epoch{epoch}'
         if not model_save_path.exists():
             model_save_path.mkdir(parents=True, exist_ok=True)
         
@@ -230,6 +230,8 @@ def main():
         view_model.save(model_save_path / 'view_lora')
 
         if config.train.stepsize > 0: scheduler.step()
+
+        wandb.log({'epoch': epoch, 'accuracy of epoch': avg_acc}, step=epoch)
 
 
 if __name__ == '__main__':

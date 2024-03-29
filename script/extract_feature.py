@@ -116,8 +116,8 @@ def main():
         classifier = classifier.to(device)     
 
     # Load model
-    # sketch_model.load(args.ckpt_dir+'sketch_lora')
-    # view_model.load(args.ckpt_dir + 'view_lora')
+    sketch_model.load(Path(config.model.ckpt_dir) /'sketch_lora')
+    view_model.load(Path(config.model.ckpt_dir) / 'view_lora')
     classifier.load_state_dict(torch.load(Path(config.model.ckpt_dir) / 'mlp_layer.pth'))
     sketch_model.eval()
     view_model.eval()

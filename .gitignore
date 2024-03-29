@@ -5,6 +5,7 @@ data/
 core.*
 hf_model/models--openai--clip-vit-base-patch32
 .vscode/
+flagged/
 
 
 # Byte-compiled / optimized / DLL files
@@ -111,3 +112,4 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+test.ipynb
