@@ -2,8 +2,8 @@ dataset:
   sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
   view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
   workers: 6
-  sketch_batch_size: 64
-  view_batch_size: 64
+  sketch_batch_size: 32
+  view_batch_size: 32
 train:
   num_classes: 133
   lr_model: 1.0e-4
@@ -17,7 +17,7 @@ train:
   seed: 1
   count: 0
 model:
-  model: "/lizhikai/workspace/clip4sbsr/hf_model/models--openai--clip-vit-base-patch32"
+  model: "./hf_model/models--openai--clip-vit-base-patch32"
   ckpt_dir: './ckpt/'
   lora_rank: 32
   alph: 12

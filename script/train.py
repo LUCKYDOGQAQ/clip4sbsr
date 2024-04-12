@@ -124,9 +124,9 @@ def train(sketch_model, view_model, classifier, criterion_am,
             view_features = view_model.forward(view_data)
 
             concat_feature = torch.cat((sketch_features, view_features), dim=0)
-            concat_labels = torch.cat((sketch_labels, view_labels), dim=0)
+            concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
 
-            logits = classifier.forward(concat_feature, mode='train')
+            logits = classifier.forward(concat_feature, mode='train') # (batch_size, num_classes=133)
             cls_loss = criterion_am(logits, concat_labels)
             loss = cls_loss
 
@@ -195,6 +195,7 @@ def main():
                                       lr=config.train.lr_model, momentum=0.9, weight_decay=2e-5)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer_model, T_max=config.train.max_epoch, last_epoch=-1)
 
+    max_acc = -1
     sketch_trainloader, view_trainloader = get_data(config.dataset.sketch_datadir, config.dataset.view_datadir)
     for epoch in range(config.train.max_epoch):
         print("==> Epoch {}/{}".format(epoch + 1, config.train.max_epoch))
@@ -220,14 +221,15 @@ def main():
         avg_acc = train(sketch_model, view_model, classifier, criterion_am,
               optimizer_model, sketch_trainloader, view_trainloader, use_gpu, device)
 
+        if avg_acc >= max_acc:
+            max_acc = avg_acc    
+            model_save_path = Path(config.model.ckpt_dir) / 'exp2' / f'Epoch{epoch}'
+            if not model_save_path.exists():
+                model_save_path.mkdir(parents=True, exist_ok=True)
 
-        model_save_path = Path(config.model.ckpt_dir) / 'exp2' / f'Epoch{epoch}'
-        if not model_save_path.exists():
-            model_save_path.mkdir(parents=True, exist_ok=True)
-        
-        torch.save(classifier.state_dict(), model_save_path / 'mlp_layer.pth')
-        sketch_model.save(model_save_path / 'sketch_lora')
-        view_model.save(model_save_path / 'view_lora')
+            torch.save(classifier.state_dict(), model_save_path / 'mlp_layer.pth')
+            sketch_model.save(model_save_path / 'sketch_lora')
+            view_model.save(model_save_path / 'view_lora')
 
         if config.train.stepsize > 0: scheduler.step()
 

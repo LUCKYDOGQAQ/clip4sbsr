@@ -19,10 +19,12 @@ class CenterLoss:
         distmat = torch.pow(features, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
                   torch.pow(weights, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
         distmat.addmm_(features, weights.t(),beta=1,alpha=-2)
+        # distmat = features^2 + weight^2 - 2 * feature * weights = (features - weights)^2
 
         classes = torch.arange(self.num_classes).long().to(self.device)
         targetss = targets.unsqueeze(1).expand(batch_size, self.num_classes)
         mask = targetss.eq(classes.expand(batch_size, self.num_classes))
+        # 
 
         dist = distmat * mask.float()
         loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size

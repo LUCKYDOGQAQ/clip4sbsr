@@ -16,6 +16,17 @@ from torchvision import datasets
 from dataset.view_dataset_reader import MultiViewDataSet
 from torchvision import transforms
 import torch.nn.functional as F
+import os
+
+view_dir = "/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_view_render_test_img"
+
+id2label = dict()
+id = 0
+for label in sorted(os.listdir(view_dir)): # Label
+    for _ in range( len(os.listdir(view_dir + '/' + label))):
+        id2label[id] = str(label)
+        id += 1
+print()
 
 def topk_result(sketch_feature, k):
     feature = torch.load("/lizhikai/workspace/clip4sbsr/output/feature.mat")
@@ -26,12 +37,12 @@ def topk_result(sketch_feature, k):
     top_scores, top_indices = torch.topk(cosine_similarities, k)
 
     # sketch_data = datasets.ImageFolder(root="/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_sketch_test_picture", transform=transforms.Resize(224))
-    view_data = MultiViewDataSet(root="/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_view_render_test_img", transform=transforms.Resize(224))
+    view_data = MultiViewDataSet(root=view_dir, transform=transforms.Resize(224))
     res_images = []
     res_labels = []
     for i in top_indices:
         res_images.append(view_data[i][0][0])
-        res_labels.append(view_data[i][0][1])
+        res_labels.append(view_data[i][1])
 
     return res_images, res_labels
 
@@ -79,14 +90,17 @@ def sbsr(input_img):
 
     # 提前计算好，数据库中的view embedding，进行比对排名，得到最相近的model
     sketch_feature = nn.functional.normalize(mu_embeddings, dim=1)
-    print(sketch_feature.size)
     res_images, res_labels = topk_result(sketch_feature, 10)
-    return res_images[0]
 
+    return zip(res_images, [id2label[index] for index in res_labels])
 
 demo = gr.Interface(fn=sbsr, 
                     inputs=gr.Image(label="Sketch"), 
-                    outputs="image",
+                    outputs=gr.Gallery(label="3D Shape Model", 
+                                       show_label=True, 
+                                    #    elem_id="gallery", 
+                                       object_fit="contain", 
+                                       height="auto"),
                     title="3D Shape Model Retrieval using Sketch",
                     description="Upload a Sketch to find the most similar 3D Shape Models!")
 
