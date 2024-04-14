@@ -1,6 +1,17 @@
+'''
+Author: Zhikai Li luckydogqaq@163.com
+Date: 2024-03-27 17:52:05
+LastEditors: Zhikai Li luckydogqaq@163.com
+LastEditTime: 2024-04-14 15:46:40
+FilePath: /clip4sbsr/dataset/view_dataset.py
+Description: 
+
+Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+'''
 from torch.utils.data.dataset import Dataset
 import os
 from PIL import Image
+from pathlib import Path
 
 class MultiViewDataSet(Dataset):
 

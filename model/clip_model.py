@@ -1,0 +1,267 @@
+'''
+Author: Zhikai Li luckydogqaq@163.com
+Date: 2024-04-12 16:26:45
+LastEditors: Zhikai Li luckydogqaq@163.com
+LastEditTime: 2024-04-14 18:29:04
+FilePath: /clip4sbsr/model/clip_model.py
+Description: 
+
+Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+'''
+
+import os
+import argparse
+from random import sample, randint
+
+import numpy as np
+import torch
+import torch.nn as nn
+from torch import optim
+from torch.optim import lr_scheduler
+import torch.backends.cudnn as cudnn
+from torchvision import transforms
+from torchvision import datasets
+from torch.utils.data import DataLoader
+
+from model.sketch_model import SketchModel
+from model.view_model import MVCNN
+from model.classifier import Classifier
+from dataset.view_dataset import MultiViewDataSet
+from loss.am_softmax import AMSoftMaxLoss
+import os
+
+from tqdm import tqdm
+from pathlib import Path
+import yaml
+from easydict import EasyDict
+
+from utils.metric import evaluation_metric, cal_cosine_distance
+
+from peft import LoraConfig
+
+import wandb
+
+
+import torch
+import torch.nn as nn
+import lightning as L
+
+
+class Clip4SbsrModel(L.LightningModule):
+    def __init__(self, config):
+        super(Clip4SbsrModel, self).__init__()
+        self.config = config
+        self.initialize_model()
+        self.initialize_optimizers()
+
+        # self.metrics = {}
+        # for stage in ["train", "valid", "test"]:
+        #     stage_metrics = self.initialize_metrics(stage)
+        #     # Rigister metrics as attributes
+        #     for metric_name, metric in stage_metrics.items():
+        #         setattr(self, metric_name, metric)
+                
+        #     self.metrics[stage] = stage_metrics
+
+        self.sketch_features = []
+        self.sketch_labels = []
+        self.view_features = []
+        self.view_labels = []
+
+        # Prompt Engineering
+        self.sk_prompt = nn.Parameter(torch.randn(self.config.prompt.n_prompts, self.config.prompt.prompt_dim))
+        self.img_prompt = nn.Parameter(torch.randn(self.config.prompt.n_prompts, self.config.prompt.prompt_dim))
+        
+    # def encode_sketch():
+    #     pass
+
+    # def encode_shape():
+    #     pass
+    
+    def initialize_model(self):
+        lora_config = LoraConfig(target_modules=["q_proj", "k_proj"],
+                                 r=self.config.lora_rank,
+                                 lora_alpha=16,
+                                 lora_dropout=0.1)
+        self.sketch_model = SketchModel(lora_config, self.config.backbone)
+        self.view_model = MVCNN(lora_config, self.config.backbone)
+        self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim, self.config.classifier.num_classes)
+        
+    def initialize_metrics(self, stage):
+        return {}
+    
+    def initialize_optimizers(self):
+        self.optimizer = optim.SGD([
+            {"params": filter(lambda p: p.requires_grad, self.sketch_model.parameters()), "lr": self.config.lr_model},
+            {"params": filter(lambda p: p.requires_grad, self.view_model.parameters()), "lr": self.config.lr_model},
+            {"params": self.classifier.parameters(), "lr": self.config.lr_model * 10}], 
+            lr=self.config.lr_model, momentum=0.9, weight_decay=2e-5)
+
+        self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=100, last_epoch=-1)
+
+    def check_save_condition(self, now_value: float, mode: str, save_info: dict = None) -> None:
+        """
+        Check whether to save model. If save_path is not None and now_value is the best, save model.
+        Args:
+            now_value: Current metric value
+            mode: "min" or "max", meaning whether the lower the better or the higher the better
+            save_info: Other info to save
+        """
+
+        assert mode in ["min", "max"], "mode should be 'min' or 'max'"
+
+        if self.config.save_path is not None:
+            dir = os.path.dirname(self.config.save_path)
+            os.makedirs(dir, exist_ok=True)
+            # save the best checkpoint
+            best_value = getattr(self, f"best_value", None)
+            if best_value:
+                if mode == "min" and now_value < best_value or mode == "max" and now_value > best_value:
+                    setattr(self, "best_value", now_value)
+                    self.save_checkpoint()
+
+            else:
+                setattr(self, "best_value", now_value)
+                self.save_checkpoint()
+
+    def save_checkpoint(self):
+        # model_save_path = Path(self.config.model.ckpt_dir)
+        # if not self.model_save_path.exists():
+        #     model_save_path.mkdir(parents=True, exist_ok=True)
+
+        torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
+        self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
+        self.view_model.save(Path(self.config.save_path) / 'view_lora')
+
+    def load_checkpoint(self):
+        self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
+        self.view_model.load(Path(self.config.save_path) / 'view_lora')
+        self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
+        # sketch_model.eval()
+        # view_model.eval()
+        # classifier.eval() 
+    
+    
+    def on_train_epoch_start(self):
+        return
+
+    def training_step(self, batch, batch_idx):
+        sketch_batch, view_batch  = batch
+        sketch_datas, sketch_labels = sketch_batch
+        view_datas, view_labels = view_batch
+        view_datas = torch.stack(view_datas, axis=1)
+        # view_datas = torch.from_numpy(view_datas)
+
+        sketch_features = self.sketch_model.forward(sketch_datas)
+        view_features = self.view_model.forward(view_datas)
+
+        concat_feature = torch.cat((sketch_features, view_features), dim=0)
+        concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
+        logits = self.classifier.forward(concat_feature, mode='train') # (batch_size, num_classes=133)
+
+        criterion_am = AMSoftMaxLoss()
+        cls_loss = criterion_am(logits, concat_labels)
+        loss = cls_loss
+
+        _, predicted = torch.max(logits.data, 1)
+        correct = (predicted == concat_labels).sum()
+        acc = correct.item() / concat_labels.size(0)
+        
+        self.log_dict({"train_loss": loss, "train_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+    
+    def on_train_epoch_end(self):
+        self.save_checkpoint()
+        pass
+    
+    def validation_step(self, batch, batch_idx):
+        return
+
+    def on_validation_epoch_end(self):
+        # pred = self.validation_step_outputs
+
+        # self.validation_step_outputs.clear()
+        # self.check_save_condition(self.metrics["valid"]["accuracy"], mode="max")
+        return
+
+    def test_step(self, batch, batch_idx):
+        sketch_batch, view_batch  = batch
+        sketch_datas, sketch_labels = sketch_batch
+        view_datas, view_labels = view_batch
+
+
+        sketch_feature_batch = self.extract_feature("sketch", sketch_datas)
+        sketch_label_batch = sketch_labels.detach().cpu().clone().numpy()
+
+        view_feature_batch = self.extract_feature("view", view_datas)
+        view_label_batch = view_labels.detach().cpu().clone().numpy()
+
+
+        self.sketch_features.append(sketch_feature_batch)
+        self.sketch_labels.append(sketch_label_batch)
+
+        self.view_features.append(view_feature_batch)
+        self.view_labels.append(view_label_batch)
+
+
+    def on_test_epoch_end(self):
+        sketch_features = np.concatenate((self.sketch_features),axis=0)
+        view_features = np.concatenate((self.sketch_labels),axis=0)
+        sketch_labels = np.concatenate((self.view_features),axis=0)
+        view_labels = np.concatenate((self.view_labels),axis=0)
+
+        # feature_data = {
+        #     'sketch_features': sketch_features, 
+        #     'sketch_labels': sketch_labels,
+        #     'view_features': view_features, 
+        #     'view_labels': view_labels
+        # }
+        
+        distance_matrix = cal_cosine_distance(sketch_features, view_features)
+        Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision = evaluation_metric(distance_matrix, sketch_labels, view_labels, 'cosine')
+        log_dict = {
+            'Av_NN': Av_NN.mean(),
+            'Av_FT': Av_FT.mean(),
+            'Av_ST': Av_ST.mean(),
+            'Av_E': Av_E.mean(),
+            'Av_DCG': Av_DCG.mean(),
+            'Av_Precision': Av_Precision.mean()
+        }
+
+        self.log_dict(log_dict)
+        
+    
+    def configure_optimizers(self):
+        return {
+            "optimizer": self.optimizer,
+            "lr_scheduler": self.scheduler
+            }
+    
+    
+    '''
+    description: 
+    param {*} self: 
+    param {*} modal: "sketch" or "view"
+    param {*} data: a batch of datas
+    return {*} features of datas
+    '''
+    def extract_feature(self, modal, datas):
+        if modal == "sketch":
+            output = self.sketch_model.forward(datas)
+        if modal == "view":
+            output = self.view_model.forward(datas)
+        mu_embeddings= self.classifier.forward(output)
+
+        feature_batch = nn.functional.normalize(mu_embeddings, dim=1)
+        feature_batch_numpy = feature_batch.detach().cpu().clone().numpy()
+
+        return feature_batch_numpy
+
+        if modal == "sketch":
+            self.sketch_features=np.concatenate((self.sketch_features,feature_batch_numpy),axis=0)
+            self.sketch_labels=np.concatenate((self.sketch_labels,labels_batch_numpy),axis=0)
+        if modal == "view":
+            self.view_features=np.concatenate((self.view_features,feature_batch_numpy),axis=0)
+            self.view_labels=np.concatenate((self.view_labels,labels_batch_numpy),axis=0)
+            
+                

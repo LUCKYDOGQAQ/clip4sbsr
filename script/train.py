@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from model.sketch_model import SketchModel
 from model.view_model import MVCNN
 from model.classifier import Classifier
-from dataset.view_dataset_reader import MultiViewDataSet
+from dataset.view_dataset import MultiViewDataSet
 from loss.am_softmax import AMSoftMaxLoss
 import os
 

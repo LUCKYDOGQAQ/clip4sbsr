@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 from torchvision import datasets
-from dataset.view_dataset_reader import MultiViewDataSet
+from dataset.view_dataset import MultiViewDataSet
 from torchvision import transforms
 import torch.nn.functional as F
 import os

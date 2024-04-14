@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from model.sketch_model import SketchModel
 from model.classifier import Classifier
 from model.view_model import MVCNN
-from dataset.view_dataset_reader import MultiViewDataSet
+from dataset.view_dataset import MultiViewDataSet
 from utils.metric import evaluation_metric, cal_cosine_distance
 #from sketch_dataset import SketchDataSet
 # from sklearn.metrics.pairwise import cosine_similarity

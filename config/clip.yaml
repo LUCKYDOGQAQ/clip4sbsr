@@ -1,0 +1,28 @@
+dataset:
+  sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
+  view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
+  num_workers: 6
+  batch_size: 32
+model:
+  backbone: "./hf_model/models--openai--clip-vit-base-patch32"
+  save_path: './ckpt/'
+  lora_rank: 32
+  lr_model: 1.0e-4
+  # gamma: 0.9
+  classifier:
+    alph: 12
+    feat_dim: 512
+    num_classes: 133
+  prompt:
+    lr_prompt: 1.0e-4
+    prompt_dim: 512
+
+trainer:
+  max_epochs: 2
+  # stepsize: 10
+  # print_freq: 10
+  # save_model_freq: 10
+  gpu: '0,1,2,3'
+  seed: 1
+  count: 0
+
