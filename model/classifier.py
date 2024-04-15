@@ -22,12 +22,16 @@ class Classifier(nn.Module):
                                             weight_normalization=True)
 
 
-    def forward(self,x,mode='test'):
+    def forward(self,x,mode='test', prompt=None):
+        if prompt is not None:
+            prompt = prompt.expand(x.shape[0], -1) # shape = [batch_size, prompt_dim]
+            x = torch.cat([x, prompt], dim=1) # shape = [batch_size, x_dim + prompt_dim]
+        
         x1 = self.fc1(x)
         # x1 = self.fc2(x1)
         # x1 = self.fc3(x1)
         x1 = self.fc4(x1)
-        #x1 = nn.functional.normalize(x1, dim=1)
+        # x1 = nn.functional.normalize(x1, dim=1)
         logits,weights = self.fc5(x1)
         if mode=='train':
             return logits

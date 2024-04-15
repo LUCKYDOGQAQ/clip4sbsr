@@ -1,6 +1,8 @@
 dataset:
-  sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
-  view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
+  train_sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
+  train_view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
+  test_sketch_datadir: './data/SHREC13_ZS2/13_sketch_test_picture'
+  test_view_datadir: './data/SHREC13_ZS2/13_view_render_test_img'
   num_workers: 6
   batch_size: 32
 model:
@@ -14,8 +16,10 @@ model:
     feat_dim: 512
     num_classes: 133
   prompt:
-    lr_prompt: 1.0e-4
+    use_prompt: True
+    n_prompts: 3
     prompt_dim: 512
+    lr_prompt: 1.0e-4
 
 trainer:
   max_epochs: 2

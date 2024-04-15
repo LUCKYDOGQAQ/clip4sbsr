@@ -8,7 +8,7 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 
 from torchvision import transforms
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, random_split
 
 import yaml
 import argparse
@@ -53,9 +53,20 @@ view_transform = transforms.Compose([
 
 clip_model = Clip4SbsrModel(config.model)
 
+clip_dataset = Clip4SbsrDataset(config.dataset.train_sketch_datadir, sketch_transform, config.dataset.train_view_datadir, view_transform)
 
-clip_dataset = Clip4SbsrDataset(config.dataset.sketch_datadir, sketch_transform, config.dataset.view_datadir, view_transform)
-clip_dataloader = DataLoader(clip_dataset, 
+train_size = int(0.8 * len(clip_dataset))
+val_size = len(clip_dataset) - train_size
+train_dataset, val_dataset = random_split(clip_dataset, [train_size, val_size])
+
+train_dataloader = DataLoader(train_dataset, 
+                             batch_size=config.dataset.batch_size,
+                             shuffle=True,
+                             num_workers=config.dataset.num_workers,
+                            #  sampler=sampler
+                             )
+
+val_dataloader = DataLoader(val_dataset, 
                              batch_size=config.dataset.batch_size,
                              shuffle=True,
                              num_workers=config.dataset.num_workers,
@@ -63,8 +74,21 @@ clip_dataloader = DataLoader(clip_dataset,
                              )
 
 trainer = L.Trainer(max_epochs=config.trainer.max_epochs,
-                    logger = wandb_logger)
+                    logger = wandb_logger,
+                    limit_train_batches=10)
 
-trainer.fit(model=clip_model, 
-            train_dataloaders=clip_dataloader)
+# trainer.fit(model=clip_model, 
+#             train_dataloaders=train_dataloader,
+#             val_dataloaders=val_dataloader)
+
+test_dataset = Clip4SbsrDataset(config.dataset.test_sketch_datadir, sketch_transform, config.dataset.test_view_datadir, view_transform)
+test_dataloader = DataLoader(test_dataset, 
+                             batch_size=config.dataset.batch_size,
+                             shuffle=True,
+                             num_workers=config.dataset.num_workers,
+                            #  sampler=sampler
+                             )
+clip_model.load_checkpoint()
+trainer.test(model=clip_model, 
+            dataloaders=test_dataloader)
 

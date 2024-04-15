@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-04-14 18:29:04
+LastEditTime: 2024-04-15 14:48:51
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -67,35 +67,58 @@ class Clip4SbsrModel(L.LightningModule):
         self.sketch_labels = []
         self.view_features = []
         self.view_labels = []
-
-        # Prompt Engineering
-        self.sk_prompt = nn.Parameter(torch.randn(self.config.prompt.n_prompts, self.config.prompt.prompt_dim))
-        self.img_prompt = nn.Parameter(torch.randn(self.config.prompt.n_prompts, self.config.prompt.prompt_dim))
         
     # def encode_sketch():
     #     pass
 
     # def encode_shape():
     #     pass
+        
+    # def forward():
+    #     pass
     
     def initialize_model(self):
+        if self.config.prompt.use_prompt:
+            self.prompt = nn.Parameter(torch.randn(self.config.prompt.prompt_dim))
+            prompt_dim = self.config.prompt.prompt_dim
+        else:
+            self.prompt = None
+            prompt_dim = 0
+        
         lora_config = LoraConfig(target_modules=["q_proj", "k_proj"],
                                  r=self.config.lora_rank,
                                  lora_alpha=16,
                                  lora_dropout=0.1)
+        
         self.sketch_model = SketchModel(lora_config, self.config.backbone)
         self.view_model = MVCNN(lora_config, self.config.backbone)
-        self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim, self.config.classifier.num_classes)
+        self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim + prompt_dim, self.config.classifier.num_classes)
         
     def initialize_metrics(self, stage):
         return {}
     
     def initialize_optimizers(self):
-        self.optimizer = optim.SGD([
-            {"params": filter(lambda p: p.requires_grad, self.sketch_model.parameters()), "lr": self.config.lr_model},
-            {"params": filter(lambda p: p.requires_grad, self.view_model.parameters()), "lr": self.config.lr_model},
-            {"params": self.classifier.parameters(), "lr": self.config.lr_model * 10}], 
-            lr=self.config.lr_model, momentum=0.9, weight_decay=2e-5)
+        param_list = [
+            {
+                "params": filter(lambda p: p.requires_grad, self.sketch_model.parameters()), 
+                "lr": self.config.lr_model
+            },
+            {
+                "params": filter(lambda p: p.requires_grad, self.view_model.parameters()), 
+                "lr": self.config.lr_model
+            },
+            {
+                "params": self.classifier.parameters(), 
+                "lr": self.config.lr_model * 10
+            }]
+        
+        if self.config.prompt.use_prompt:
+            param_list.append({
+                "params": [self.prompt], 
+                "lr": self.config.prompt.lr_prompt
+            })
+
+        self.optimizer = optim.SGD(param_list, lr=self.config.lr_model, momentum=0.9, weight_decay=2e-5)
 
         self.scheduler = lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=100, last_epoch=-1)
 
@@ -132,11 +155,15 @@ class Clip4SbsrModel(L.LightningModule):
         torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
         self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
         self.view_model.save(Path(self.config.save_path) / 'view_lora')
+        if self.config.prompt.use_prompt:   
+            torch.save(self.prompt.detach(), Path(self.config.save_path) / 'prompt.pth')
 
     def load_checkpoint(self):
         self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
         self.view_model.load(Path(self.config.save_path) / 'view_lora')
         self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
+        if self.config.prompt.use_prompt:
+            self.prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'prompt.pth'))
         # sketch_model.eval()
         # view_model.eval()
         # classifier.eval() 
@@ -150,14 +177,13 @@ class Clip4SbsrModel(L.LightningModule):
         sketch_datas, sketch_labels = sketch_batch
         view_datas, view_labels = view_batch
         view_datas = torch.stack(view_datas, axis=1)
-        # view_datas = torch.from_numpy(view_datas)
 
         sketch_features = self.sketch_model.forward(sketch_datas)
         view_features = self.view_model.forward(view_datas)
 
         concat_feature = torch.cat((sketch_features, view_features), dim=0)
         concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
-        logits = self.classifier.forward(concat_feature, mode='train') # (batch_size, num_classes=133)
+        logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
 
         criterion_am = AMSoftMaxLoss()
         cls_loss = criterion_am(logits, concat_labels)
@@ -188,7 +214,7 @@ class Clip4SbsrModel(L.LightningModule):
         sketch_batch, view_batch  = batch
         sketch_datas, sketch_labels = sketch_batch
         view_datas, view_labels = view_batch
-
+        view_datas = torch.stack(view_datas, axis=1)
 
         sketch_feature_batch = self.extract_feature("sketch", sketch_datas)
         sketch_label_batch = sketch_labels.detach().cpu().clone().numpy()
@@ -206,8 +232,9 @@ class Clip4SbsrModel(L.LightningModule):
 
     def on_test_epoch_end(self):
         sketch_features = np.concatenate((self.sketch_features),axis=0)
-        view_features = np.concatenate((self.sketch_labels),axis=0)
-        sketch_labels = np.concatenate((self.view_features),axis=0)
+        view_features = np.concatenate((self.view_features),axis=0)
+
+        sketch_labels = np.concatenate((self.sketch_labels),axis=0)
         view_labels = np.concatenate((self.view_labels),axis=0)
 
         # feature_data = {
@@ -250,18 +277,10 @@ class Clip4SbsrModel(L.LightningModule):
             output = self.sketch_model.forward(datas)
         if modal == "view":
             output = self.view_model.forward(datas)
-        mu_embeddings= self.classifier.forward(output)
+        mu_embeddings= self.classifier.forward(output,mode="test",prompt=self.prompt)
 
         feature_batch = nn.functional.normalize(mu_embeddings, dim=1)
         feature_batch_numpy = feature_batch.detach().cpu().clone().numpy()
 
         return feature_batch_numpy
-
-        if modal == "sketch":
-            self.sketch_features=np.concatenate((self.sketch_features,feature_batch_numpy),axis=0)
-            self.sketch_labels=np.concatenate((self.sketch_labels,labels_batch_numpy),axis=0)
-        if modal == "view":
-            self.view_features=np.concatenate((self.view_features,feature_batch_numpy),axis=0)
-            self.view_labels=np.concatenate((self.view_labels,labels_batch_numpy),axis=0)
-            
                 
