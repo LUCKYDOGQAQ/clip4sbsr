@@ -7,7 +7,7 @@ dataset:
   batch_size: 32
 model:
   backbone: "./hf_model/models--openai--clip-vit-base-patch32"
-  save_path: './ckpt/'
+  save_path: './ckpt/prompt'
   lora_rank: 32
   lr_model: 1.0e-4
   # gamma: 0.9
@@ -22,7 +22,7 @@ model:
     lr_prompt: 1.0e-4
 
 trainer:
-  max_epochs: 2
+  max_epochs: 30
   # stepsize: 10
   # print_freq: 10
   # save_model_freq: 10

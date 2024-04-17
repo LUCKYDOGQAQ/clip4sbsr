@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-04-15 14:48:51
+LastEditTime: 2024-04-16 11:14:14
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -67,6 +67,14 @@ class Clip4SbsrModel(L.LightningModule):
         self.sketch_labels = []
         self.view_features = []
         self.view_labels = []
+
+        self.train_correct = 0
+        self.train_total = 0
+        self.valid_correct = 0
+        self.valid_total = 0
+        self.best_value = 0
+
+        self.epoch = 0
         
     # def encode_sketch():
     #     pass
@@ -155,7 +163,8 @@ class Clip4SbsrModel(L.LightningModule):
         torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
         self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
         self.view_model.save(Path(self.config.save_path) / 'view_lora')
-        if self.config.prompt.use_prompt:   
+        if self.config.prompt.use_prompt: 
+            print(f"save epoch {self.epoch} checkpoint!")
             torch.save(self.prompt.detach(), Path(self.config.save_path) / 'prompt.pth')
 
     def load_checkpoint(self):
@@ -191,24 +200,59 @@ class Clip4SbsrModel(L.LightningModule):
 
         _, predicted = torch.max(logits.data, 1)
         correct = (predicted == concat_labels).sum()
-        acc = correct.item() / concat_labels.size(0)
-        
-        self.log_dict({"train_loss": loss, "train_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # acc = correct.item() / concat_labels.size(0)
+
+        self.train_correct += correct
+        self.train_total += concat_labels.size(0)
+ 
+        # self.log_dict({"train_loss": loss, "train_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
     
     def on_train_epoch_end(self):
-        self.save_checkpoint()
-        pass
+        self.epoch += 1
+        acc = self.train_correct / self.train_total
+        self.train_correct, self.train_total = 0, 0
+        self.log("train accuracy", acc, prog_bar=True, logger=True)
+        # self.check_save_condition(acc, mode="max")
     
     def validation_step(self, batch, batch_idx):
-        return
+        sketch_batch, view_batch  = batch
+        sketch_datas, sketch_labels = sketch_batch
+        view_datas, view_labels = view_batch
+        view_datas = torch.stack(view_datas, axis=1)
+
+        sketch_features = self.sketch_model.forward(sketch_datas)
+        view_features = self.view_model.forward(view_datas)
+
+        concat_feature = torch.cat((sketch_features, view_features), dim=0)
+        concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
+        logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
+
+        criterion_am = AMSoftMaxLoss()
+        cls_loss = criterion_am(logits, concat_labels)
+        loss = cls_loss
+
+        _, predicted = torch.max(logits.data, 1)
+        correct = (predicted == concat_labels).sum()
+        # acc = correct.item() / concat_labels.size(0)
+        
+        self.valid_correct += correct
+        self.valid_total += concat_labels.size(0)
+
+        self.log("valid_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
+        # self.log_dict({"valid_loss": loss, "valid_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
 
     def on_validation_epoch_end(self):
         # pred = self.validation_step_outputs
-
         # self.validation_step_outputs.clear()
-        # self.check_save_condition(self.metrics["valid"]["accuracy"], mode="max")
-        return
+        acc = self.valid_correct / self.valid_total
+        self.valid_correct, self.valid_total = 0, 0
+        self.log("vliad accuracy", acc, prog_bar=True, logger=True)
+        self.check_save_condition(acc, mode="max")
+
 
     def test_step(self, batch, batch_idx):
         sketch_batch, view_batch  = batch
@@ -255,7 +299,7 @@ class Clip4SbsrModel(L.LightningModule):
             'Av_Precision': Av_Precision.mean()
         }
 
-        self.log_dict(log_dict)
+        self.log_dict(log_dict, logger=True)
         
     
     def configure_optimizers(self):

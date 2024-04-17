@@ -68,23 +68,22 @@ train_dataloader = DataLoader(train_dataset,
 
 val_dataloader = DataLoader(val_dataset, 
                              batch_size=config.dataset.batch_size,
-                             shuffle=True,
+                            #  shuffle=True,
                              num_workers=config.dataset.num_workers,
                             #  sampler=sampler
                              )
 
 trainer = L.Trainer(max_epochs=config.trainer.max_epochs,
-                    logger = wandb_logger,
-                    limit_train_batches=10)
+                    logger = wandb_logger)
 
-# trainer.fit(model=clip_model, 
-#             train_dataloaders=train_dataloader,
-#             val_dataloaders=val_dataloader)
+trainer.fit(model=clip_model, 
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader)
 
 test_dataset = Clip4SbsrDataset(config.dataset.test_sketch_datadir, sketch_transform, config.dataset.test_view_datadir, view_transform)
 test_dataloader = DataLoader(test_dataset, 
                              batch_size=config.dataset.batch_size,
-                             shuffle=True,
+                            #  shuffle=True,
                              num_workers=config.dataset.num_workers,
                             #  sampler=sampler
                              )
