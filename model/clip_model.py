@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-04-16 11:14:14
+LastEditTime: 2024-04-29 19:39:41
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -28,6 +28,7 @@ from model.view_model import MVCNN
 from model.classifier import Classifier
 from dataset.view_dataset import MultiViewDataSet
 from loss.am_softmax import AMSoftMaxLoss
+from loss.triplet_center_loss import TripletCenterLoss
 import os
 
 from tqdm import tqdm
@@ -101,6 +102,7 @@ class Clip4SbsrModel(L.LightningModule):
         self.sketch_model = SketchModel(lora_config, self.config.backbone)
         self.view_model = MVCNN(lora_config, self.config.backbone)
         self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim + prompt_dim, self.config.classifier.num_classes)
+        self.centers = nn.Parameter(torch.randn(self.config.classifier.num_classes, self.config.classifier.num_classes)) 
         
     def initialize_metrics(self, stage):
         return {}
@@ -125,6 +127,12 @@ class Clip4SbsrModel(L.LightningModule):
                 "params": [self.prompt], 
                 "lr": self.config.prompt.lr_prompt
             })
+
+        # centers
+        param_list.append({
+               "params": [self.centers], 
+               "lr": self.config.lr_model
+           })
 
         self.optimizer = optim.SGD(param_list, lr=self.config.lr_model, momentum=0.9, weight_decay=2e-5)
 
@@ -156,9 +164,8 @@ class Clip4SbsrModel(L.LightningModule):
                 self.save_checkpoint()
 
     def save_checkpoint(self):
-        # model_save_path = Path(self.config.model.ckpt_dir)
-        # if not self.model_save_path.exists():
-        #     model_save_path.mkdir(parents=True, exist_ok=True)
+        if not Path(self.config.save_path).exists():
+            Path(self.config.save_path).mkdir(parents=True, exist_ok=True)
 
         torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
         self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
@@ -166,18 +173,25 @@ class Clip4SbsrModel(L.LightningModule):
         if self.config.prompt.use_prompt: 
             print(f"save epoch {self.epoch} checkpoint!")
             torch.save(self.prompt.detach(), Path(self.config.save_path) / 'prompt.pth')
-
+        
     def load_checkpoint(self):
         self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
         self.view_model.load(Path(self.config.save_path) / 'view_lora')
         self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
         if self.config.prompt.use_prompt:
             self.prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'prompt.pth'))
-        # sketch_model.eval()
-        # view_model.eval()
-        # classifier.eval() 
-    
-    
+
+  
+    def loss_func(self, inputs, targets):
+        criterion_am = AMSoftMaxLoss()
+        cls_loss = criterion_am(inputs, targets)
+        criterion_tcl = TripletCenterLoss()
+        tcl_loss = criterion_tcl(inputs, targets, self.centers)
+        loss = cls_loss + tcl_loss
+
+        return loss
+
+
     def on_train_epoch_start(self):
         return
 
@@ -194,9 +208,7 @@ class Clip4SbsrModel(L.LightningModule):
         concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
         logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
 
-        criterion_am = AMSoftMaxLoss()
-        cls_loss = criterion_am(logits, concat_labels)
-        loss = cls_loss
+        loss = self.loss_func(logits, concat_labels)
 
         _, predicted = torch.max(logits.data, 1)
         correct = (predicted == concat_labels).sum()
@@ -205,15 +217,15 @@ class Clip4SbsrModel(L.LightningModule):
         self.train_correct += correct
         self.train_total += concat_labels.size(0)
  
-        # self.log_dict({"train_loss": loss, "train_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log_dict({"train_loss": loss, "train_acc": acc}, on_step=True, on_epoch=True, prog_bar=False, logger=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=False, logger=True)
         return loss
     
     def on_train_epoch_end(self):
         self.epoch += 1
         acc = self.train_correct / self.train_total
         self.train_correct, self.train_total = 0, 0
-        self.log("train accuracy", acc, prog_bar=True, logger=True)
+        self.log("train accuracy", acc, prog_bar=False, logger=True)
         # self.check_save_condition(acc, mode="max")
     
     def validation_step(self, batch, batch_idx):
@@ -229,9 +241,7 @@ class Clip4SbsrModel(L.LightningModule):
         concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
         logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
 
-        criterion_am = AMSoftMaxLoss()
-        cls_loss = criterion_am(logits, concat_labels)
-        loss = cls_loss
+        loss = self.loss_func(logits, concat_labels)
 
         _, predicted = torch.max(logits.data, 1)
         correct = (predicted == concat_labels).sum()
@@ -240,9 +250,9 @@ class Clip4SbsrModel(L.LightningModule):
         self.valid_correct += correct
         self.valid_total += concat_labels.size(0)
 
-        self.log("valid_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("valid_loss", loss, on_step=True, on_epoch=True, prog_bar=False, logger=True)
 
-        # self.log_dict({"valid_loss": loss, "valid_acc": acc}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log_dict({"valid_loss": loss, "valid_acc": acc}, on_step=True, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
     def on_validation_epoch_end(self):
@@ -250,7 +260,7 @@ class Clip4SbsrModel(L.LightningModule):
         # self.validation_step_outputs.clear()
         acc = self.valid_correct / self.valid_total
         self.valid_correct, self.valid_total = 0, 0
-        self.log("vliad accuracy", acc, prog_bar=True, logger=True)
+        self.log("vliad accuracy", acc, prog_bar=False, logger=True)
         self.check_save_condition(acc, mode="max")
 
 
@@ -281,13 +291,14 @@ class Clip4SbsrModel(L.LightningModule):
         sketch_labels = np.concatenate((self.sketch_labels),axis=0)
         view_labels = np.concatenate((self.view_labels),axis=0)
 
-        # feature_data = {
-        #     'sketch_features': sketch_features, 
-        #     'sketch_labels': sketch_labels,
-        #     'view_features': view_features, 
-        #     'view_labels': view_labels
-        # }
-        
+        feature_data = {
+            'sketch_features': sketch_features, 
+            'sketch_labels': sketch_labels,
+            'view_features': view_features, 
+            'view_labels': view_labels
+        }
+        torch.save(feature_data, Path(self.config.save_path) / 'feature.pt' )
+
         distance_matrix = cal_cosine_distance(sketch_features, view_features)
         Av_NN, Av_FT, Av_ST, Av_E, Av_DCG, Av_Precision = evaluation_metric(distance_matrix, sketch_labels, view_labels, 'cosine')
         log_dict = {

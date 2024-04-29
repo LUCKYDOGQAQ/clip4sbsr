@@ -10,4 +10,8 @@ pip install easydict==1.13
 pip install wandb==0.15.12
 pip install scipy==1.12.0
 pip install scikit-learn==1.3.2
+pip install plotly==5.21.0
+pip install notebook>=5.3 
+pip install ipywidgets>=7.5
+
 

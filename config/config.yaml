@@ -7,7 +7,7 @@ dataset:
   batch_size: 32
 model:
   backbone: "./hf_model/models--openai--clip-vit-base-patch32"
-  save_path: './ckpt/prompt'
+  save_path: './ckpt/tcl'
   lora_rank: 32
   lr_model: 1.0e-4
   # gamma: 0.9
@@ -16,7 +16,7 @@ model:
     feat_dim: 512
     num_classes: 133
   prompt:
-    use_prompt: True
+    use_prompt: False
     n_prompts: 3
     prompt_dim: 512
     lr_prompt: 1.0e-4
