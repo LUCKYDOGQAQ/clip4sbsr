@@ -23,9 +23,9 @@ class Classifier(nn.Module):
 
 
     def forward(self,x,mode='test', prompt=None):
-        if prompt is not None:
-            prompt = prompt.expand(x.shape[0], -1) # shape = [batch_size, prompt_dim]
-            x = torch.cat([x, prompt], dim=1) # shape = [batch_size, x_dim + prompt_dim]
+        # if prompt is not None:
+        #     prompt = prompt.expand(x.shape[0], -1, -1) # shape = [batch_size, num_prompt, feat_dim]
+        #     x = torch.cat([x, prompt], dim=1) # shape = [batch_size, num_patch+num_prompt , feat_dim]
         
         x1 = self.fc1(x)
         # x1 = self.fc2(x1)

@@ -30,7 +30,7 @@ class MVCNN(nn.Module):
         else: self.device = "cpu"
 
 
-    def forward(self, x):
+    def forward(self, x, prompt=None):
         """
         Args:
             x: input a batch of image
@@ -74,12 +74,26 @@ class MVCNN(nn.Module):
         #feature = self.layer2(feature)
         #feature = self.fc1(feature)"""
 
+        batch_size = x.shape[0]
         x = x.transpose(0, 1)
         view_pool = []
 
         for v in x:
             v = v.type(torch.FloatTensor).to(self.device)
-            feature = self.model(v).image_embeds
+            # feature = self.model(v).image_embeds
+
+            v = self.model.vision_model.embeddings(v)
+
+            if prompt is not None:
+                prompt = prompt.expand(batch_size, -1, -1) # shape = [batch_size, num_prompt, feat_dim]
+                v = torch.cat([v, prompt], dim=1) # # shape = [batch_size, num_patch+num_prompt , feat_dim]
+
+            v = self.model.vision_model.pre_layrnorm(v)
+            last_hidden_state = self.model.vision_model.encoder(v)['last_hidden_state']
+            pooled_output = last_hidden_state[:, 0, :]
+            pooled_output = self.model.vision_model.post_layernorm(pooled_output)
+            feature = self.model.visual_projection(pooled_output)
+
             feature=feature.unsqueeze(0)
             view_pool.append(feature)
 

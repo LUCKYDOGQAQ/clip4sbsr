@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-04-29 19:39:41
+LastEditTime: 2024-05-12 22:00:07
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -84,26 +84,54 @@ class Clip4SbsrModel(L.LightningModule):
     #     pass
         
     # def forward():
-    #     pass
+    #     return logits
     
     def initialize_model(self):
         if self.config.prompt.use_prompt:
-            self.prompt = nn.Parameter(torch.randn(self.config.prompt.prompt_dim))
-            prompt_dim = self.config.prompt.prompt_dim
+            self.sketch_prompt = nn.Parameter(torch.randn(self.config.prompt.num_prompts, self.config.prompt.prompt_dim))
+            self.view_prompt = self.sketch_prompt
+            if self.config.prompt.shared_prompt is False:
+                self.view_prompt = nn.Parameter(torch.randn(self.config.prompt.num_prompts, self.config.prompt.prompt_dim))
         else:
-            self.prompt = None
-            prompt_dim = 0
+            self.sketch_prompt = None
+            self.view_prompt = None
         
-        lora_config = LoraConfig(target_modules=["q_proj", "k_proj"],
-                                 r=self.config.lora_rank,
-                                 lora_alpha=16,
-                                 lora_dropout=0.1)
+        if self.config.lora.use_lora:
+            lora_config = LoraConfig(target_modules=["q_proj", "k_proj"],
+                                     r=self.config.lora.lora_rank,
+                                     lora_alpha=16,
+                                     lora_dropout=0.1)
+        else:
+            lora_config = None
         
         self.sketch_model = SketchModel(lora_config, self.config.backbone)
         self.view_model = MVCNN(lora_config, self.config.backbone)
-        self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim + prompt_dim, self.config.classifier.num_classes)
-        self.centers = nn.Parameter(torch.randn(self.config.classifier.num_classes, self.config.classifier.num_classes)) 
-        
+        self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim, self.config.classifier.num_classes)
+        self.centers = nn.Parameter(torch.randn(self.config.classifier.num_classes, self.config.classifier.num_classes)) # 行表示一类，列表示这类与其他类的logit
+
+        # if self.config.prompt.use_prompt:
+        #     self.freeze_except_layer_norm()
+
+        # 打印模型的可训练参数
+        print("Trainable Parameters:")
+        for name, param in self.sketch_model.named_parameters():
+            if param.requires_grad:
+                print(name)
+        for name, param in self.view_model.named_parameters():
+            if param.requires_grad:
+                print(name)
+        for name, param in self.classifier.named_parameters():
+            if param.requires_grad:
+                print(name)
+
+    def freeze_except_layer_norm(self):
+        for name, param in self.sketch_model.named_parameters():
+            if 'layer_norm' not in name:
+                param.requires_grad = False
+        for name, param in self.view_model.named_parameters():
+            if 'layer_norm' not in name:
+                param.requires_grad = False
+
     def initialize_metrics(self, stage):
         return {}
     
@@ -124,9 +152,15 @@ class Clip4SbsrModel(L.LightningModule):
         
         if self.config.prompt.use_prompt:
             param_list.append({
-                "params": [self.prompt], 
+                "params": [self.sketch_prompt], 
                 "lr": self.config.prompt.lr_prompt
             })
+            if self.config.prompt.shared_prompt is False:
+                param_list.append({
+                "params": [self.view_prompt], 
+                "lr": self.config.prompt.lr_prompt
+                })
+
 
         # centers
         param_list.append({
@@ -172,14 +206,16 @@ class Clip4SbsrModel(L.LightningModule):
         self.view_model.save(Path(self.config.save_path) / 'view_lora')
         if self.config.prompt.use_prompt: 
             print(f"save epoch {self.epoch} checkpoint!")
-            torch.save(self.prompt.detach(), Path(self.config.save_path) / 'prompt.pth')
+            torch.save(self.sketch_prompt.detach(), Path(self.config.save_path) / 'sketch_prompt.pth')
+            torch.save(self.view_prompt.detach(), Path(self.config.save_path) / 'view_prompt.pth')
         
     def load_checkpoint(self):
         self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
         self.view_model.load(Path(self.config.save_path) / 'view_lora')
         self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
         if self.config.prompt.use_prompt:
-            self.prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'prompt.pth'))
+            self.sketch_prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'sketch_prompt.pth'))
+            self.view_prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'view_prompt.pth'))
 
   
     def loss_func(self, inputs, targets):
@@ -201,12 +237,12 @@ class Clip4SbsrModel(L.LightningModule):
         view_datas, view_labels = view_batch
         view_datas = torch.stack(view_datas, axis=1)
 
-        sketch_features = self.sketch_model.forward(sketch_datas)
-        view_features = self.view_model.forward(view_datas)
+        sketch_features = self.sketch_model.forward(sketch_datas, prompt=self.sketch_prompt)
+        view_features = self.view_model.forward(view_datas, prompt=self.view_prompt)
 
         concat_feature = torch.cat((sketch_features, view_features), dim=0)
         concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
-        logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
+        logits = self.classifier.forward(concat_feature, mode='train') # (batch_size, num_classes=133)
 
         loss = self.loss_func(logits, concat_labels)
 
@@ -234,12 +270,12 @@ class Clip4SbsrModel(L.LightningModule):
         view_datas, view_labels = view_batch
         view_datas = torch.stack(view_datas, axis=1)
 
-        sketch_features = self.sketch_model.forward(sketch_datas)
-        view_features = self.view_model.forward(view_datas)
+        sketch_features = self.sketch_model.forward(sketch_datas, prompt=self.sketch_prompt)
+        view_features = self.view_model.forward(view_datas, prompt=self.view_prompt)
 
         concat_feature = torch.cat((sketch_features, view_features), dim=0)
         concat_labels = torch.cat((sketch_labels, view_labels), dim=0) # (batch_size, )
-        logits = self.classifier.forward(concat_feature, mode='train', prompt=self.prompt) # (batch_size, num_classes=133)
+        logits = self.classifier.forward(concat_feature, mode='train') # (batch_size, num_classes=133)
 
         loss = self.loss_func(logits, concat_labels)
 
@@ -329,10 +365,10 @@ class Clip4SbsrModel(L.LightningModule):
     '''
     def extract_feature(self, modal, datas):
         if modal == "sketch":
-            output = self.sketch_model.forward(datas)
+            output = self.sketch_model.forward(datas, self.sketch_prompt)
         if modal == "view":
-            output = self.view_model.forward(datas)
-        mu_embeddings= self.classifier.forward(output,mode="test",prompt=self.prompt)
+            output = self.view_model.forward(datas, self.view_prompt)
+        mu_embeddings= self.classifier.forward(output,mode="test")
 
         feature_batch = nn.functional.normalize(mu_embeddings, dim=1)
         feature_batch_numpy = feature_batch.detach().cpu().clone().numpy()

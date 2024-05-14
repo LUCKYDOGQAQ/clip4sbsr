@@ -1,3 +1,11 @@
+'''
+Author: Zhikai Li luckydogqaq@163.com
+Date: 2024-05-12 21:41:26
+LastEditors: Zhikai Li luckydogqaq@163.com
+LastEditTime: 2024-05-12 21:41:27
+FilePath: /clip4sbsr/script/clip.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import sys
 sys.path.append('.')
 
@@ -31,8 +39,8 @@ os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
 os.environ['WANDB_MODE'] = 'offline'
 
 def load_logger(config):
-    return WandbLogger(project="CLIP4SBSR",
-                       name="baseline",
+    return WandbLogger(project=config.setting.wandb.project,
+                       name=config.setting.wandb.name,
                        config=config)
 wandb_logger = load_logger(config)
 
@@ -74,7 +82,8 @@ val_dataloader = DataLoader(val_dataset,
                              )
 
 trainer = L.Trainer(max_epochs=config.trainer.max_epochs,
-                    logger = wandb_logger)
+                    logger = wandb_logger,
+                    accumulate_grad_batches = 1)
 
 trainer.fit(model=clip_model, 
             train_dataloaders=train_dataloader,

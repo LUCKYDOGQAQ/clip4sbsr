@@ -1,3 +1,7 @@
+setting:
+  wandb:
+    project: CLIP4SBSR
+    name: lora-unshared_prompt-ams_tcl
 dataset:
   train_sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
   train_view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
@@ -7,25 +11,24 @@ dataset:
   batch_size: 32
 model:
   backbone: "./hf_model/models--openai--clip-vit-base-patch32"
-  save_path: './ckpt/tcl'
-  lora_rank: 32
+  save_path: './ckpt/lora-unshared_prompt-ams_tcl'
   lr_model: 1.0e-4
-  # gamma: 0.9
   classifier:
     alph: 12
     feat_dim: 512
     num_classes: 133
+  lora:
+    use_lora: True
+    lora_rank: 32
   prompt:
-    use_prompt: False
-    n_prompts: 3
-    prompt_dim: 512
-    lr_prompt: 1.0e-4
+    use_prompt: True
+    shared_prompt: False
+    num_prompts: 3
+    prompt_dim: 768 # dim_embedding
+    lr_prompt: 1.0e-3
 
 trainer:
   max_epochs: 30
-  # stepsize: 10
-  # print_freq: 10
-  # save_model_freq: 10
   gpu: '0,1,2,3'
   seed: 1
   count: 0

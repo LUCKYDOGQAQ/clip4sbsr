@@ -22,25 +22,25 @@ top_k = 16
 backbone = "./hf_model/models--openai--clip-vit-base-patch32"
 view_dir = "/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_view_render_test_img"
 feature_path = "/lizhikai/workspace/clip4sbsr/output/feature.mat"
-ckpt_path = "/lizhikai/workspace/clip4sbsr/ckpt/no_prompt"
+ckpt_path = "/lizhikai/workspace/clip4sbsr/ckpt/lora-unshared_prompt-ams_tcl"
 
-id2label = dict()
-id = 0
-for label in sorted(os.listdir(view_dir)): # Label
-    for _ in range( len(os.listdir(view_dir + '/' + label))):
-        id2label[id] = str(label)
-        id += 1
+# id2label = dict()
+# id = 0
+# for label in sorted(os.listdir(view_dir)): # Label
+#     for _ in range( len(os.listdir(view_dir + '/' + label))):
+#         id2label[id] = str(label)
+#         id += 1
+
+feature = torch.load(feature_path)
+for key in feature.keys():
+    feature[key] = torch.tensor(feature[key]).to("cuda")
+view_data = MultiViewDataSet(root=view_dir, transform=transforms.Resize(224))
 
 def topk_result(sketch_feature, k):
-    feature = torch.load(feature_path)
-    for key in feature.keys():
-        feature[key] = torch.tensor(feature[key]).to("cuda")
-
     cosine_similarities = F.cosine_similarity(sketch_feature, feature['view_feature'], dim=1)
     top_scores, top_indices = torch.topk(cosine_similarities, k)
 
     # sketch_data = datasets.ImageFolder(root="/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_sketch_test_picture", transform=transforms.Resize(224))
-    view_data = MultiViewDataSet(root=view_dir, transform=transforms.Resize(224))
     res_images = []
     res_labels = []
     for i in top_indices:
@@ -94,7 +94,7 @@ def sbsr(input_img):
     sketch_feature = nn.functional.normalize(mu_embeddings, dim=1)
     res_images, res_labels = topk_result(sketch_feature, top_k)
 
-    return zip(res_images, [id2label[index] for index in res_labels])
+    return zip(res_images, [view_data.idx_to_class[index] for index in res_labels])
 
 def get_gallery_images():
     return  [ (f"/lizhikai/workspace/clip4sbsr/data/SHREC13_ZS2/13_view_render_test_img/ant/0/m0_{i}.png", 'ant') for i in range(12)] #[(image0, label0), (image1, label1), ...]

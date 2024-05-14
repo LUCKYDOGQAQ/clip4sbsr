@@ -1,3 +1,11 @@
+'''
+Author: Zhikai Li luckydogqaq@163.com
+Date: 2024-05-12 20:41:47
+LastEditors: Zhikai Li luckydogqaq@163.com
+LastEditTime: 2024-05-12 21:13:30
+FilePath: /clip4sbsr/model/sketch_model.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 # -*- coding: utf-8 -*-
 
 # -*- coding: utf-8 -*-
@@ -23,7 +31,7 @@ class SketchModel(nn.Module):
         if lora_config is not None:
             self.model.add_adapter(lora_config, adapter_name="sketch_adapter")
 
-    def forward(self, x):
+    def forward(self, x, prompt=None):
         """
         Args:
             x: input a batch of image
@@ -34,7 +42,20 @@ class SketchModel(nn.Module):
 
             logits:  prediction tensors to be passed to the Cross Entropy Loss
         """
-        feature = self.model(x).image_embeds
+        # feature = self.model(x).image_embeds
+
+        batch_size = x.shape[0]
+        x = self.model.vision_model.embeddings(x)
+
+        if prompt is not None:
+            prompt = prompt.expand(batch_size, -1, -1) # shape = [batch_size, num_prompt, feat_dim]
+            x = torch.cat([x, prompt], dim=1) # # shape = [batch_size, num_patch+num_prompt , feat_dim]
+
+        x = self.model.vision_model.pre_layrnorm(x)
+        last_hidden_state = self.model.vision_model.encoder(x)['last_hidden_state']
+        pooled_output = last_hidden_state[:, 0, :]
+        pooled_output = self.model.vision_model.post_layernorm(pooled_output)
+        feature = self.model.visual_projection(pooled_output)
 
         return feature
 

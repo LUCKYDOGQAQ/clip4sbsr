@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-03-27 17:52:05
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-04-14 15:46:40
+LastEditTime: 2024-05-14 11:36:29
 FilePath: /clip4sbsr/dataset/view_dataset.py
 Description: 
 
@@ -19,15 +19,16 @@ class MultiViewDataSet(Dataset):
         classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
         classes.sort()
         class_to_idx = {classes[i]: i for i in range(len(classes))}
+        idx_to_class = {i: classes[i] for i in range(len(classes))}
 
-        return classes, class_to_idx
+        return classes, class_to_idx, idx_to_class
 
     def __init__(self, root, transform=None, target_transform=None):
         self.x = []
         self.y = []
         self.root = root
         #print(self.root)
-        self.classes, self.class_to_idx = self.find_classes(root)
+        self.classes, self.class_to_idx, self.idx_to_class = self.find_classes(root)
 
         self.transform = transform
         self.target_transform = target_transform
