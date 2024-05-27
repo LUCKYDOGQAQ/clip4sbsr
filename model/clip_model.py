@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-12 22:00:07
+LastEditTime: 2024-05-28 06:03:34
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -27,6 +27,7 @@ from model.sketch_model import SketchModel
 from model.view_model import MVCNN
 from model.classifier import Classifier
 from dataset.view_dataset import MultiViewDataSet
+from torch.nn.functional import cross_entropy
 from loss.am_softmax import AMSoftMaxLoss
 from loss.triplet_center_loss import TripletCenterLoss
 import os
@@ -109,8 +110,8 @@ class Clip4SbsrModel(L.LightningModule):
         self.classifier = Classifier(self.config.classifier.alph, self.config.classifier.feat_dim, self.config.classifier.num_classes)
         self.centers = nn.Parameter(torch.randn(self.config.classifier.num_classes, self.config.classifier.num_classes)) # 行表示一类，列表示这类与其他类的logit
 
-        # if self.config.prompt.use_prompt:
-        #     self.freeze_except_layer_norm()
+        if self.config.prompt.use_prompt:
+            self.freeze_except_layer_norm()
 
         # 打印模型的可训练参数
         print("Trainable Parameters:")
@@ -192,7 +193,6 @@ class Clip4SbsrModel(L.LightningModule):
                 if mode == "min" and now_value < best_value or mode == "max" and now_value > best_value:
                     setattr(self, "best_value", now_value)
                     self.save_checkpoint()
-
             else:
                 setattr(self, "best_value", now_value)
                 self.save_checkpoint()
@@ -201,29 +201,59 @@ class Clip4SbsrModel(L.LightningModule):
         if not Path(self.config.save_path).exists():
             Path(self.config.save_path).mkdir(parents=True, exist_ok=True)
 
-        torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
-        self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
-        self.view_model.save(Path(self.config.save_path) / 'view_lora')
+        if self.config.lora.use_lora: 
+            torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
+            self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
+            self.view_model.save(Path(self.config.save_path) / 'view_lora')
+        else:
+            torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
+            torch.save(self.sketch_model.state_dict(), Path(self.config.save_path) / 'sketch_model.pth')
+            torch.save(self.view_model.state_dict(), Path(self.config.save_path) / 'view_model.pth')
+
         if self.config.prompt.use_prompt: 
             print(f"save epoch {self.epoch} checkpoint!")
             torch.save(self.sketch_prompt.detach(), Path(self.config.save_path) / 'sketch_prompt.pth')
             torch.save(self.view_prompt.detach(), Path(self.config.save_path) / 'view_prompt.pth')
         
     def load_checkpoint(self):
-        self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
-        self.view_model.load(Path(self.config.save_path) / 'view_lora')
-        self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
+
+        if self.config.lora.use_lora:
+            self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
+            self.view_model.load(Path(self.config.save_path) / 'view_lora')
+            self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
+        else:
+            self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
+            self.sketch_model.load_state_dict(torch.load(Path(self.config.save_path) / 'sketch_model.pth'))
+            self.view_model.load_state_dict(torch.load(Path(self.config.save_path) / 'view_model.pth'))
+        
         if self.config.prompt.use_prompt:
             self.sketch_prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'sketch_prompt.pth'))
             self.view_prompt = nn.Parameter(torch.load(Path(self.config.save_path) / 'view_prompt.pth'))
 
   
     def loss_func(self, inputs, targets):
-        criterion_am = AMSoftMaxLoss()
-        cls_loss = criterion_am(inputs, targets)
-        criterion_tcl = TripletCenterLoss()
-        tcl_loss = criterion_tcl(inputs, targets, self.centers)
-        loss = cls_loss + tcl_loss
+        if self.config.loss_type == "softmax":
+            loss = cross_entropy(inputs, targets)
+
+        elif self.config.loss_type == "ams":
+            criterion_am = AMSoftMaxLoss()
+            cls_loss = criterion_am(inputs, targets)
+            loss = cls_loss
+
+        elif self.config.loss_type == "tcl":
+            criterion_tcl = TripletCenterLoss()
+            tcl_loss = criterion_tcl(inputs, targets, self.centers)
+            loss = tcl_loss
+
+        elif self.config.loss_type == "ams+tcl":
+            criterion_am = AMSoftMaxLoss()
+            cls_loss = criterion_am(inputs, targets) 
+
+            criterion_tcl = TripletCenterLoss()
+            tcl_loss = criterion_tcl(inputs, targets, self.centers)
+
+            loss = cls_loss + tcl_loss
+        
 
         return loss
 
@@ -300,6 +330,10 @@ class Clip4SbsrModel(L.LightningModule):
         self.check_save_condition(acc, mode="max")
 
 
+    def on_test_epoch_start(self):
+        self.load_checkpoint()
+        return
+    
     def test_step(self, batch, batch_idx):
         sketch_batch, view_batch  = batch
         sketch_datas, sketch_labels = sketch_batch
@@ -368,7 +402,7 @@ class Clip4SbsrModel(L.LightningModule):
             output = self.sketch_model.forward(datas, self.sketch_prompt)
         if modal == "view":
             output = self.view_model.forward(datas, self.view_prompt)
-        mu_embeddings= self.classifier.forward(output,mode="test")
+        mu_embeddings= self.classifier.forward(output, mode="test")
 
         feature_batch = nn.functional.normalize(mu_embeddings, dim=1)
         feature_batch_numpy = feature_batch.detach().cpu().clone().numpy()

@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-05-12 21:41:26
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-12 21:41:27
+LastEditTime: 2024-05-28 06:10:02
 FilePath: /clip4sbsr/script/clip.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -25,13 +25,25 @@ from easydict import EasyDict
 import wandb
 
 import os
-
+import torch
+import numpy as np
+import random
 
 
 parser = argparse.ArgumentParser("CLIP for SBSR")
 parser.add_argument('-c', '--config', help="running configurations", type=str, required=True)
 with open(parser.parse_args().config, 'r', encoding='utf-8') as r:
     config = EasyDict(yaml.safe_load(r))
+
+
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+setup_seed(config.setting.seed)
 
 os.environ['CUDA_VISIBLE_DEVICES'] = config.trainer.gpu
 os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
@@ -96,7 +108,7 @@ test_dataloader = DataLoader(test_dataset,
                              num_workers=config.dataset.num_workers,
                             #  sampler=sampler
                              )
-clip_model.load_checkpoint()
+# clip_model.load_checkpoint()
 trainer.test(model=clip_model, 
             dataloaders=test_dataloader)
 

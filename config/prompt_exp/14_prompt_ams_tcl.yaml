@@ -1,0 +1,36 @@
+setting:
+  seed: 42
+  wandb:
+    project: CLIP4SBSR_v2
+    name: 14_prompt_ams_tcl
+dataset:
+  train_sketch_datadir: './data/SHREC14_ZS2/14_sketch_train_picture'
+  train_view_datadir: './data/SHREC14_ZS2/14_view_render_train_img'
+  test_sketch_datadir: './data/SHREC14_ZS2/14_sketch_test_picture'
+  test_view_datadir: './data/SHREC14_ZS2/14_view_render_test_img'
+  num_workers: 6
+  batch_size: 32
+model:
+  backbone: "./hf_model/models--openai--clip-vit-base-patch32"
+  save_path: './ckpt/loss_exp/14_prompt_ams_tcl'
+  lr_model: 1.0e-4
+  loss_type: "ams+tcl"
+  classifier:
+    alph: 12
+    feat_dim: 512
+    num_classes: 133
+  lora:
+    use_lora: False
+    lora_rank: 32
+  prompt:
+    use_prompt: True
+    shared_prompt: False
+    num_prompts: 3
+    prompt_dim: 768 # dim_embedding
+    lr_prompt: 1.0e-3
+
+trainer:
+  max_epochs: 30
+  gpu: '0,1,2,3'
+  count: 0
+
