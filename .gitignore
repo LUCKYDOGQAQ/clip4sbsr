@@ -110,7 +110,6 @@ wandb/
 data/
 core.*
 hf_model/models--openai--clip-vit-base-patch32
-.vscode/
 flagged/
 test.ipynb
 lightning_logs/
