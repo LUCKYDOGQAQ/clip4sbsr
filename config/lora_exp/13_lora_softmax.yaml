@@ -18,7 +18,7 @@ model:
   classifier:
     alph: 12
     feat_dim: 512
-    num_classes: 133
+    num_classes: 67
   lora:
     use_lora: True
     lora_rank: 32
@@ -30,7 +30,7 @@ model:
     lr_prompt: 1.0e-3
 
 trainer:
-  max_epochs: 30
+  max_epochs: 40
   gpu: '0,1,2,3'
   count: 0
 

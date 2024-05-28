@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-28 06:03:34
+LastEditTime: 2024-05-28 11:44:47
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -197,23 +197,25 @@ class Clip4SbsrModel(L.LightningModule):
                 setattr(self, "best_value", now_value)
                 self.save_checkpoint()
 
-    def save_checkpoint(self):
-        if not Path(self.config.save_path).exists():
-            Path(self.config.save_path).mkdir(parents=True, exist_ok=True)
+    def save_checkpoint(self, save_path=None):
+        print(f"save epoch {self.epoch} checkpoint!")
+        if save_path is None:
+            save_path = Path(self.config.save_path)
+        if not Path(save_path).exists():
+            Path(save_path).mkdir(parents=True, exist_ok=True)
 
         if self.config.lora.use_lora: 
-            torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
-            self.sketch_model.save(Path(self.config.save_path) / 'sketch_lora')
-            self.view_model.save(Path(self.config.save_path) / 'view_lora')
+            torch.save(self.classifier.state_dict(), Path(save_path) / 'mlp_layer.pth')
+            self.sketch_model.save(Path(save_path) / 'sketch_lora')
+            self.view_model.save(Path(save_path) / 'view_lora')
         else:
-            torch.save(self.classifier.state_dict(), Path(self.config.save_path) / 'mlp_layer.pth')
-            torch.save(self.sketch_model.state_dict(), Path(self.config.save_path) / 'sketch_model.pth')
-            torch.save(self.view_model.state_dict(), Path(self.config.save_path) / 'view_model.pth')
+            torch.save(self.classifier.state_dict(), Path(save_path) / 'mlp_layer.pth')
+            torch.save(self.sketch_model.state_dict(), Path(save_path) / 'sketch_model.pth')
+            torch.save(self.view_model.state_dict(), Path(save_path) / 'view_model.pth')
 
         if self.config.prompt.use_prompt: 
-            print(f"save epoch {self.epoch} checkpoint!")
-            torch.save(self.sketch_prompt.detach(), Path(self.config.save_path) / 'sketch_prompt.pth')
-            torch.save(self.view_prompt.detach(), Path(self.config.save_path) / 'view_prompt.pth')
+            torch.save(self.sketch_prompt.detach(), Path(save_path) / 'sketch_prompt.pth')
+            torch.save(self.view_prompt.detach(), Path(save_path) / 'view_prompt.pth')
         
     def load_checkpoint(self):
 
@@ -327,6 +329,8 @@ class Clip4SbsrModel(L.LightningModule):
         acc = self.valid_correct / self.valid_total
         self.valid_correct, self.valid_total = 0, 0
         self.log("vliad accuracy", acc, prog_bar=False, logger=True)
+        if self.epoch % 5 == 0:
+            self.save_checkpoint(Path(self.config.save_path) / f"Epoch {self.epoch}")
         self.check_save_condition(acc, mode="max")
 
 

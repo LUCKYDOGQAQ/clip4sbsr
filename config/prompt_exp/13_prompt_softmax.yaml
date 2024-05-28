@@ -2,7 +2,7 @@ setting:
   seed: 42
   wandb:
     project: CLIP4SBSR_v2
-    name: 13_prompt_softmax
+    name: 13_prompt_softmax_v3
 dataset:
   train_sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
   train_view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
@@ -18,7 +18,7 @@ model:
   classifier:
     alph: 12
     feat_dim: 512
-    num_classes: 133
+    num_classes: 67
   lora:
     use_lora: False
     lora_rank: 32
@@ -27,10 +27,10 @@ model:
     shared_prompt: False
     num_prompts: 3
     prompt_dim: 768 # dim_embedding
-    lr_prompt: 1.0e-3
+    lr_prompt: 1.0e-4
 
 trainer:
-  max_epochs: 30
+  max_epochs: 5
   gpu: '0,1,2,3'
   count: 0
 

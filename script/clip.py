@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-05-12 21:41:26
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-28 06:10:02
+LastEditTime: 2024-05-28 11:14:41
 FilePath: /clip4sbsr/script/clip.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -34,7 +34,6 @@ parser = argparse.ArgumentParser("CLIP for SBSR")
 parser.add_argument('-c', '--config', help="running configurations", type=str, required=True)
 with open(parser.parse_args().config, 'r', encoding='utf-8') as r:
     config = EasyDict(yaml.safe_load(r))
-
 
 def setup_seed(seed):
     torch.manual_seed(seed)

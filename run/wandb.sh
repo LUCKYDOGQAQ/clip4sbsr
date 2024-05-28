@@ -1,6 +1,8 @@
-wandb sync ./wandb/offline-run-20240527_041605-a5pvxxbl
-wandb sync ./wandb/offline-run-20240527_054345-e1fc5soi
-wandb sync ./wandb/offline-run-20240527_071128-2sa7hb1x
-wandb sync ./wandb/offline-run-20240527_084520-5lps714v
-wandb sync ./wandb/offline-run-20240527_114545-gezj28bg
-wandb sync ./wandb/offline-run-20240527_144841-bpvg5hpt
+cd /lizhikai/workspace/clip4sbsr
+
+wandb sync ./wandb/offline-run-20240526_214458-mtuziabn
+wandb sync ./wandb/offline-run-20240527_010840-9qiogtmt
+wandb sync ./wandb/offline-run-20240527_041527-xrfr29hj
+wandb sync ./wandb/offline-run-20240527_075309-kwdurc07
+wandb sync ./wandb/offline-run-20240527_174824-lav9j1vk
+wandb sync ./wandb/offline-run-20240528_024526-gttx5u5b
