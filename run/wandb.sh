@@ -1,8 +1,8 @@
 cd /lizhikai/workspace/clip4sbsr
 
-wandb sync ./wandb/offline-run-20240526_214458-mtuziabn
-wandb sync ./wandb/offline-run-20240527_010840-9qiogtmt
-wandb sync ./wandb/offline-run-20240527_041527-xrfr29hj
-wandb sync ./wandb/offline-run-20240527_075309-kwdurc07
-wandb sync ./wandb/offline-run-20240527_174824-lav9j1vk
-wandb sync ./wandb/offline-run-20240528_024526-gttx5u5b
+wandb sync ./wandb/offline-run-20240528_125618-hjycvgs8
+wandb sync ./wandb/offline-run-20240528_140818-py0vtf7p
+wandb sync ./wandb/offline-run-20240528_152000-5n53yar9
+wandb sync ./wandb/offline-run-20240528_163558-xfa88f1l
+wandb sync ./wandb/offline-run-20240528_191953-uskk2iz6
+wandb sync ./wandb/offline-run-20240528_220213-dd8qafnc

@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-05-12 21:41:26
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-28 11:14:41
+LastEditTime: 2024-05-29 10:11:43
 FilePath: /clip4sbsr/script/clip.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -70,6 +70,13 @@ view_transform = transforms.Compose([
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073],
                          [0.26862954, 0.26130258, 0.27577711])])
 
+test_transform = transforms.Compose([
+    transforms.Resize(224),
+    transforms.ToTensor(),
+    transforms.Normalize([0.48145466, 0.4578275, 0.40821073],
+                         [0.26862954, 0.26130258, 0.27577711])])
+
+
 clip_model = Clip4SbsrModel(config.model)
 
 clip_dataset = Clip4SbsrDataset(config.dataset.train_sketch_datadir, sketch_transform, config.dataset.train_view_datadir, view_transform)
@@ -94,13 +101,14 @@ val_dataloader = DataLoader(val_dataset,
 
 trainer = L.Trainer(max_epochs=config.trainer.max_epochs,
                     logger = wandb_logger,
+                    num_sanity_val_steps = 0,
                     accumulate_grad_batches = 1)
 
 trainer.fit(model=clip_model, 
             train_dataloaders=train_dataloader,
             val_dataloaders=val_dataloader)
 
-test_dataset = Clip4SbsrDataset(config.dataset.test_sketch_datadir, sketch_transform, config.dataset.test_view_datadir, view_transform)
+test_dataset = Clip4SbsrDataset(config.dataset.test_sketch_datadir, test_transform, config.dataset.test_view_datadir, test_transform)
 test_dataloader = DataLoader(test_dataset, 
                              batch_size=config.dataset.batch_size,
                             #  shuffle=True,

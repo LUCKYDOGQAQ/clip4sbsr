@@ -1,6 +1,6 @@
 setting:
   wandb:
-    project: CLIP4SBSR_v2
+    project: CLIP4SBSR_v4
     name: 13_fft_ams_tcl
 dataset:
   train_sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'

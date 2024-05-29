@@ -2,7 +2,7 @@
 Author: Zhikai Li luckydogqaq@163.com
 Date: 2024-04-12 16:26:45
 LastEditors: Zhikai Li luckydogqaq@163.com
-LastEditTime: 2024-05-28 11:44:47
+LastEditTime: 2024-05-29 01:27:29
 FilePath: /clip4sbsr/model/clip_model.py
 Description: 
 
@@ -217,12 +217,17 @@ class Clip4SbsrModel(L.LightningModule):
             torch.save(self.sketch_prompt.detach(), Path(save_path) / 'sketch_prompt.pth')
             torch.save(self.view_prompt.detach(), Path(save_path) / 'view_prompt.pth')
         
-    def load_checkpoint(self):
-
+    def load_checkpoint(self, save_path=None):
+        if save_path is None:
+            save_path = Path(self.config.save_path)
+        if not Path(save_path).exists():
+            Path(save_path).mkdir(parents=True, exist_ok=True)
+        print(f"Loaded checkpoint: {save_path}")
+            
         if self.config.lora.use_lora:
+            self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
             self.sketch_model.load(Path(self.config.save_path) /'sketch_lora')
             self.view_model.load(Path(self.config.save_path) / 'view_lora')
-            self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
         else:
             self.classifier.load_state_dict(torch.load(Path(self.config.save_path) / 'mlp_layer.pth'))
             self.sketch_model.load_state_dict(torch.load(Path(self.config.save_path) / 'sketch_model.pth'))

@@ -1,6 +1,6 @@
 setting:
   wandb:
-    project: CLIP4SBSR_v2
+    project: CLIP4SBSR_v4
     name: 14_fft_softmax
 dataset:
   train_sketch_datadir: './data/SHREC14_ZS2/14_sketch_train_picture'

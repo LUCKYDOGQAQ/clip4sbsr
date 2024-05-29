@@ -1,8 +1,8 @@
 setting:
   seed: 42
   wandb:
-    project: CLIP4SBSR_v2
-    name: 13_lora_ams_tcl_v2
+    project: CLIP4SBSR_v4
+    name: 13_lora_ams_tcl
 dataset:
   train_sketch_datadir: './data/SHREC13_ZS2/13_sketch_train_picture'
   train_view_datadir: './data/SHREC13_ZS2/13_view_render_train_img'
@@ -12,8 +12,8 @@ dataset:
   batch_size: 32
 model:
   backbone: "./hf_model/models--openai--clip-vit-base-patch32"
-  save_path: './ckpt/lora_epx/13_lora_ams_tcl'
-  lr_model: 1.0e-4
+  save_path: './ckpt/CLIP4SBSR_v3/13_lora_ams_tcl'
+  lr_model: 1.0e-5
   loss_type: "ams+tcl"
   classifier:
     alph: 12
@@ -30,7 +30,7 @@ model:
     lr_prompt: 1.0e-4
 
 trainer:
-  max_epochs: 40
+  max_epochs: 10
   gpu: '0,1,2,3'
   count: 0
 
